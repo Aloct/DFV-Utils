@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 type DBWrapper interface {
@@ -51,11 +51,11 @@ func NewRedisWrapper(rateLimit bool, pwRotation bool, subject string, container 
 	redisClient := RedisWrapper{
 		BaseWrapper: BaseWrapper{
 			RateLimitEnabled: rateLimit,
-			PwRotationEnabled: true,
-			Subject: "redisSessions",
-			Container: "redis-session",
-			Port: 6379,
-			Password: "",
+			PwRotationEnabled: pwRotation,
+			Subject: subject,
+			Container: container,
+			Port: port,
+			Password: password,
 		},
 	}
 
@@ -69,7 +69,7 @@ func (r *RedisWrapper) Connect(ctx context.Context) error {
 		DB: 0,
 	})
 
-	_, err := rdb.Ping().Result()
+	_, err := rdb.Ping(context.Background()).Result()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		log.Fatalf("Redis connection failed %v", err)
