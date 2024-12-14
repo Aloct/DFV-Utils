@@ -1,4 +1,4 @@
-module github.com/Aloct/DFV/encryptUtils
+module github.com/Aloct/DFV-Utils/encryptUtils
 
 go 1.23.3
 
