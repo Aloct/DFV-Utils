@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/go-redis/redis/v8"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type DBWrapper interface {
