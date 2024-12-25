@@ -80,7 +80,7 @@ func (r *RedisWrapper) Connect(ctx context.Context) error {
 		fmt.Fprintln(os.Stderr, err)
 		log.Fatalf("Redis connection failed %v", err)
 	}
-	fmt.Println("Connected to Redis")
+	fmt.Println("Connected to redis-session")
 
 	r.DB = rdb
 	return nil
@@ -135,5 +135,30 @@ func (sr *MySQLWrapper) Connect() {
 		log.Fatal(err)
 	}
 
+	fmt.Println("Connected to mysql-userdata")
+
 	sr.DB = db
+}
+
+// expectedDts: map[string]any
+func (sr *MySQLWrapper) getData(query string, expectedDts map[int]map[string]any) {
+	rows, err := sr.DB.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+	}
+}
+
+func (sr *MySQLWrapper) setData(query string) {
+	result, err := sr.DB.Exec(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// audit relevant
+	fmt.Println(result)
 }
