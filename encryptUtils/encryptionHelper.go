@@ -9,12 +9,7 @@ import (
 	ecies "github.com/ecies/go"
 )
 
-func eciesEncryption(key *memguard.Enclave, KEK *memguard.Enclave) (*memguard.Enclave, error) {
-	lockedBufferKey, err := key.Open()
-	if err != nil {
-		return nil, err
-	}
-
+func eciesKeyEncryption(key *memguard.Enclave, KEK *memguard.Enclave) (*memguard.Enclave, error) {
 	lockedBufferKEK, err := KEK.Open()
 	if err != nil {
 		return nil, err
@@ -24,11 +19,18 @@ func eciesEncryption(key *memguard.Enclave, KEK *memguard.Enclave) (*memguard.En
 	if err != nil {
 		return nil, err
 	}
+	lockedBufferKEK.Destroy()
+
+	lockedBufferKey, err := key.Open()
+	if err != nil {
+		return nil, err
+	}
 
 	encryptedK, err := ecies.Encrypt(publicKEK, lockedBufferKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
+	lockedBufferKey.Destroy()
 
 	return memguard.NewEnclave(encryptedK), nil
 }

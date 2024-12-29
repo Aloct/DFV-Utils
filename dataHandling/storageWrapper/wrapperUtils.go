@@ -69,6 +69,7 @@ func NewRedisWrapper(rateLimit bool, pwRotation bool, subject string, container 
 }
 
 func (r *RedisWrapper) Connect(ctx context.Context) error {
+	fmt.Println("test")
 	rdb := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%d", r.Container, r.Port), 
 		Password: r.Password, 
@@ -141,16 +142,35 @@ func (sr *MySQLWrapper) Connect() {
 }
 
 // expectedDts: map[string]any
-func (sr *MySQLWrapper) getData(query string, expectedDts map[int]map[string]any) {
+func (sr *MySQLWrapper) getData(query string) map[int]map[string]any {
 	rows, err := sr.DB.Query(query)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer rows.Close()
 
-	count := 0
-	for rows.Next() {
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	returnedMap := make(map[int]map[string]any)
+	uncastedRowValues := make([]any, len(columns))
+	emptyMap := make(map[string]any)
+
+	for rows.Next() {
+		if err := rows.Scan(uncastedRowValues...); err != nil {
+			log.Fatal(err)
+		}
+
+		for i, v := range columns {
+			emptyMap[v] = uncastedRowValues[i]
+		}
+
+		returnedMap[uncastedRowValues[0].(int)] = emptyMap 
+	}
+
+	return returnedMap
 }
 
 func (sr *MySQLWrapper) setData(query string) {
