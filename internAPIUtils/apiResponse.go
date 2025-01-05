@@ -23,7 +23,7 @@ func WriteJson(w http.ResponseWriter, status int, context string, data interface
 	return nil
 }
 
-func writeError(w http.ResponseWriter, status int, err error) {
+func WriteError(w http.ResponseWriter, status int, err error) {
 	http.Error(w, err.Error(), status)
 
 	// SEND INTO LOG
