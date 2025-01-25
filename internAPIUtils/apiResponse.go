@@ -2,7 +2,9 @@ package internAPIUtils
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 )
 
 type stdResponse struct {
@@ -24,6 +26,7 @@ func WriteJson(w http.ResponseWriter, status int, context string, data interface
 }
 
 func WriteError(w http.ResponseWriter, status int, err error) {
+	fmt.Fprintln(os.Stderr, err)
 	http.Error(w, err.Error(), status)
 
 	// SEND INTO LOG
