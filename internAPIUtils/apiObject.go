@@ -60,7 +60,7 @@ func (s *API) Start() error {
             certFile.Destroy()
             prvKey.Destroy()
         } else {
-            return errors.New("No TLS certificate or/and TLS private key provided")
+            return errors.New("no TLS certificate or/and TLS private key provided")
         }
 
         tlsConfig := &tls.Config{
@@ -79,14 +79,14 @@ func (s *API) Start() error {
             TLSConfig: tlsConfig,
         }
 
-        fmt.Println("Starting TLS-secure API on port %s", s.Port)
+        fmt.Printf("Starting TLS-secure API on port %s", s.Port)
         err = server.ListenAndServeTLS("", "")
         if err != nil {
             return err
         }
 
     } else {
-        fmt.Println("Starting API on port %s", s.Port)
+        fmt.Printf("Starting API on port %s", s.Port)
         err := http.ListenAndServe(":"+s.Port, s.Router)
         if err != nil {
             return err

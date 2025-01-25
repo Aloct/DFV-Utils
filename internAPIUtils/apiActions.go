@@ -10,30 +10,30 @@ import (
 )
 
 // get or set key byte slice via JSON
-func getKeyFromJSON(r *http.Request) (error, *memguard.Enclave) {
+func GetKeyFromJSON(r *http.Request) (*memguard.Enclave, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	defer r.Body.Close()
 
 	var b64Encoded string
 	err = json.Unmarshal(body, &b64Encoded)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	decodedBytes, err := base64.StdEncoding.DecodeString(b64Encoded)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	enclave := memguard.NewEnclave(decodedBytes)
 
-	return nil, enclave
+	return enclave, nil
 }
 
-func setKeyAsJSON(w http.ResponseWriter, key *memguard.Enclave) error {
+func SetKeyAsJSON(w http.ResponseWriter, key *memguard.Enclave) error {
 	w.Header().Set("Content-Type", "application/json")
 
 	lockedBuffer, err  := key.Open()
