@@ -2,14 +2,11 @@ package internAPIUtils
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/awnumar/memguard"
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 )
 
 type API struct {
@@ -40,17 +37,20 @@ func (s *API) Start() error {
     if (s.Protected) {
         memguard.CatchInterrupt()
         defer memguard.Purge()
+
+        // fmt.Println("envvvvv")
         
-        err := godotenv.Load(".env")
-        if err != nil {
-            return err
-        }
+        // err := godotenv.Load(".env")
+        // if err != nil {
+        //     return err
+        // }
 
         var cert tls.Certificate
+        var err error
 
-        if (os.Getenv("TLS_cert") != "" || os.Getenv("TLS_prv") != "") {
-            certFile := memguard.NewBufferFromBytes([]byte(os.Getenv("TLS_cert")))
-            prvKey := memguard.NewBufferFromBytes([]byte(os.Getenv("TLS_prv")))
+        // if (os.Getenv("TLS_cert") != "" || os.Getenv("TLS_prv") != "") {
+            certFile := memguard.NewBufferFromBytes([]byte("/TLS/ec_cert.pem"))
+            prvKey := memguard.NewBufferFromBytes([]byte("/TLS/ec_private_Key.pem"))
     
             cert, err = tls.LoadX509KeyPair(string(certFile.Bytes()), string(prvKey.Bytes()))
             if err != nil {
