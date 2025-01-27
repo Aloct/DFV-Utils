@@ -15,12 +15,6 @@ var (
 	pasetoRefreshMaster = []byte("01234567890123456789012345678901")
 )
 
-func toZero(byteSlice []byte) {
-	for i := range byteSlice {
-		byteSlice[i] = 0
-	}
-}
-
 func aesDecryption(ciphertext *memguard.Enclave, key []byte) (*memguard.Enclave, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -83,7 +77,7 @@ func aesEncryption(plaintext *memguard.Enclave, key []byte) (*memguard.Enclave, 
 	return memguard.NewEnclave(ciphertext), nil
 }
 
-func KekDecryption(kek *memguard.Enclave, master string) (*memguard.Enclave, error) {
+func KeyDecryption(kek *memguard.Enclave, master string) (*memguard.Enclave, error) {
 	var masterKey []byte
 	if master == "pasetoA" {
 		masterKey = pasetoAccessMaster
