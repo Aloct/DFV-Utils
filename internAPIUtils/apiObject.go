@@ -79,14 +79,14 @@ func (s *API) Start() error {
             TLSConfig: tlsConfig,
         }
 
-        fmt.Printf("Starting TLS-secure API on port %s", s.Port)
+        fmt.Println(fmt.Printf("Starting TLS-secure API on port %s", s.Port))
         err = server.ListenAndServeTLS("", "")
         if err != nil {
             return err
         }
 
     } else {
-        fmt.Printf("Starting API on port %s", s.Port)
+        fmt.Println(fmt.Printf("Starting API on port %s", s.Port))
         err := http.ListenAndServe(":"+s.Port, s.Router)
         if err != nil {
             return err
