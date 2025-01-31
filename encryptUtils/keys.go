@@ -1,8 +1,13 @@
 package encryptUtils
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 
 	"github.com/awnumar/memguard"
 )
@@ -13,20 +18,74 @@ type dekCombKEK struct {
 }
 
 // dek is encrypted via the kek which is referenced by kekRef, passed dek must be unencrypted
-func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string) *dekCombKEK {
-	return &dekCombKEK{
-		Dek: dek,
-		KekDB: kekDB,
+func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, managerC string, managerP int) (*dekCombKEK, error) {
+	kek, err := CreateAESKey(32)
+	if err != nil {
+		return nil, err
 	}
+
+	dekEncrypted, err := AesEncryption(kek, dek)
+	if err != nil {
+		return nil, err
+	}
+
+	keyBuf, err := kek.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer keyBuf.Destroy()
+
+	jsonData, err := json.Marshal(base64.StdEncoding.EncodeToString(keyBuf.Bytes()) + ";" + kekDB)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s:%d/registerKEK", managerC, managerP), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusCreated {
+		return nil, errors.New("failed to add key comb to auth manager")
+	}
+
+	return &dekCombKEK{
+		Dek: dekEncrypted,
+		KekDB: kekDB,
+	}, nil
 }
 
 // https://developer.ibm.com/tutorials/docker-dev-db/
 
-func (*dekCombKEK) DecryptDEK() *memguard.Enclave {
+func (*dekCombKEK) DecryptDEK(plaintext *memguard.Enclave, encryption bool) *memguard.Enclave {
+	// get KEK from decryptKEK()
+	
+	// decrypt DEK 
+
+	// perfrom en/decryption with DEK
+	if encryption {
+
+	} else if !encryption {
+
+	}
+
 	return nil
 }
 
 func (*dekCombKEK) decryptKEK() *memguard.Enclave {
+	// check if KEK is cached
+
+	// y => fetch from redis 
+	// n => fetch from sql 
+
 	return nil
 }
 
