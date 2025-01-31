@@ -9,14 +9,14 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-// IMPLEMENT KMS USAGE TO PERFROM MASTER ENCRYPTION
-var (
-	pasetoAccessMaster = []byte("01234567890123456789012345678901")
-	pasetoRefreshMaster = []byte("01234567890123456789012345678901")
-)
+func AesDecryption(ciphertext *memguard.Enclave, key *memguard.Enclave) (*memguard.Enclave, error) { 
+	lockedKey, err := key.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer lockedKey.Destroy()
 
-func aesDecryption(ciphertext *memguard.Enclave, key []byte) (*memguard.Enclave, error) {
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(lockedKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +50,14 @@ func aesDecryption(ciphertext *memguard.Enclave, key []byte) (*memguard.Enclave,
 	return plaintextEnclave, nil
 }
 
-func aesEncryption(plaintext *memguard.Enclave, key []byte) (*memguard.Enclave, error) {
-	block, err := aes.NewCipher(key)
+func AesEncryption(plaintext *memguard.Enclave, key *memguard.Enclave) (*memguard.Enclave, error) {
+	lockedKey, err := key.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer lockedKey.Destroy()
+
+	block, err := aes.NewCipher(lockedKey.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -75,23 +81,4 @@ func aesEncryption(plaintext *memguard.Enclave, key []byte) (*memguard.Enclave, 
 	plaintextLocked.Destroy()
 
 	return memguard.NewEnclave(ciphertext), nil
-}
-
-func KeyDecryption(kek *memguard.Enclave, master string) (*memguard.Enclave, error) {
-	var masterKey []byte
-	if master == "pasetoA" {
-		masterKey = pasetoAccessMaster
-	} else if master == "pasetoR" {
-		masterKey = pasetoRefreshMaster
-	}
-	
-	encryptedKek, err := aesDecryption(kek, masterKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return encryptedKek, nil
-}
-
-func KekEncryption(kek *memguard.Enclave) {
 }

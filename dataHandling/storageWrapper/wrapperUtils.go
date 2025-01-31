@@ -64,6 +64,10 @@ func NewDBPool() *DBPool {
 }
 
 func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
+	if p.pool[dbName] != nil {
+		return p.pool[dbName].(*RedisWrapper), nil
+	}
+
 	err := godotenv.Load(".env")
 	if err != nil {
 		return nil, err
@@ -131,7 +135,11 @@ type MySQLWrapper struct {
 	User string
 }
 
-func (p DBPool) NewSQLWrapper(dbName string) *MySQLWrapper{
+func (p DBPool) NewSQLWrapper(dbName string, connectff bool) *MySQLWrapper{
+	if p.pool[dbName] != nil {
+		return p.pool[dbName].(*MySQLWrapper)
+	}
+
 	sqlWrapper := MySQLWrapper{
 		BaseWrapper: BaseWrapper{
 			// RateLimitEnabled: rateLimit,
@@ -143,6 +151,10 @@ func (p DBPool) NewSQLWrapper(dbName string) *MySQLWrapper{
 		},
 		DBname: os.Getenv(dbName  + "_NAME"),
 		User: os.Getenv(dbName  + "_USER"),
+	}
+
+	if connectff {
+		sqlWrapper.Connect(context.Background())
 	}
 
 	p.pool[dbName] = sqlWrapper
@@ -174,7 +186,7 @@ func (sr *MySQLWrapper) Close() error {
 }
 
 // expectedDts: map[string]any
-func (sr *MySQLWrapper) getData(query string) map[int]map[string]any {
+func (sr *MySQLWrapper) GetData(query string) map[int]map[string]any {
 	rows, err := sr.DB.Query(query)
 	if err != nil {
 		log.Fatal(err)
@@ -205,8 +217,10 @@ func (sr *MySQLWrapper) getData(query string) map[int]map[string]any {
 	return returnedMap
 }
 
-func (sr *MySQLWrapper) setData(query string) {
-	result, err := sr.DB.Exec(query)
+func (sr *MySQLWrapper) SetData(query string, values []any) {
+	fmt.Println(sr.DB)
+
+	result, err := sr.DB.Exec(query, values...)
 	if err != nil {
 		log.Fatal(err)
 	}

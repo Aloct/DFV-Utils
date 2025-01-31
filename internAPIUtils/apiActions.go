@@ -3,6 +3,7 @@ package internAPIUtils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-// get or set key byte slice via JSON
 func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, string, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -23,6 +23,8 @@ func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+
+	fmt.Println(b64Encoded)
 
 	splitted := strings.Split(b64Encoded, ";")
 
