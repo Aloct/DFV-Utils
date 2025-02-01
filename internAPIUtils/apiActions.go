@@ -3,7 +3,6 @@ package internAPIUtils
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -23,8 +22,6 @@ func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-
-	fmt.Println(b64Encoded)
 
 	splitted := strings.Split(b64Encoded, ";")
 

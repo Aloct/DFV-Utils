@@ -96,7 +96,6 @@ func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 }
 
 func (r *RedisWrapper) Connect(ctx context.Context) error {
-	fmt.Println("test")
 	rdb := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%d", r.Container, r.Port), 
 		Password: "", 
@@ -163,7 +162,6 @@ func (p DBPool) NewSQLWrapper(dbName string, connectff bool) *MySQLWrapper{
 }
 
 func (sr *MySQLWrapper) Connect(ctx context.Context) error {
-	fmt.Println("test")
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", sr.User, sr.Password, sr.Container, sr.Port, sr.DBname))
 	if err != nil {
 		return err
@@ -217,14 +215,14 @@ func (sr *MySQLWrapper) GetData(query string) map[int]map[string]any {
 	return returnedMap
 }
 
-func (sr *MySQLWrapper) SetData(query string, values []any) {
-	fmt.Println(sr.DB)
-
+func (sr *MySQLWrapper) SetData(query string, values []any) error {
 	result, err := sr.DB.Exec(query, values...)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// audit relevant
 	fmt.Println(result)
+
+	return nil
 }
