@@ -114,7 +114,6 @@ func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 }
 
 func (r *RedisWrapper) Connect(ctx context.Context) error {
-	fmt.Println("test")
 	rdb := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%d", r.Container, r.Port), 
 		Password: "", 
