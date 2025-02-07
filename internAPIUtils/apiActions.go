@@ -37,20 +37,17 @@ func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, string, error) {
 	return enclave, add, nil
 }
 
-func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave, add string) error {
-	w.Header().Set("Content-Type", "application/json")
-
-	lockedBuffer, err  := key.Open()
+func GetStdResponse(r http.Response) (*stdResponse, error) {
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer lockedBuffer.Destroy()
+	defer r.Body.Close()
 
-	b64Encoded := base64.StdEncoding.EncodeToString(lockedBuffer.Bytes())
+	var data stdResponse
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
 
-	b64Encoded = b64Encoded + ";" + add
-
-	json.NewEncoder(w).Encode(b64Encoded)
-
-	return nil
+	return &data, err
 }
