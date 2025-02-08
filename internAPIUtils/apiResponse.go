@@ -11,7 +11,6 @@ import (
 )
 
 type stdResponse struct {
-	Status  int         `json:"status"`
 	Context string      `json:"context"`
 	Data    interface{} `json:"data,omitempty"`
 }

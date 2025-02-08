@@ -3,6 +3,7 @@ package internAPIUtils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -42,10 +43,13 @@ func GetStdResponse(r http.Response) (*stdResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer r.Body.Close()
+
+	fmt.Println("reading body...")
+	fmt.Println(body)
 
 	var data stdResponse
 	if err := json.Unmarshal(body, &data); err != nil {
+		fmt.Println("Test")
 		return nil, err
 	}
 
