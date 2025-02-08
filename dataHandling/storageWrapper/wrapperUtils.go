@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"strconv"
 	"time"
 
@@ -84,13 +84,11 @@ func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 		return nil, err
 	}
 
-	fmt.Println(dbName)
 	dbNum, err := strconv.Atoi(os.Getenv(dbName + "_NUM"))
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println(dbName)
 	dbPort, err := strconv.Atoi(os.Getenv(dbName + "_PORT"))
 	if err != nil {
 		return nil, err
@@ -154,7 +152,6 @@ func (r *RedisWrapper) SetData(query string, values []any, duration *time.Durati
 
 func (r *RedisWrapper) GetKey(id string) (any, error) {
 	val := r.DB.Get(context.Background(), id)
-	fmt.Println(val)
 
 	returnedData, err := func () (*memguard.Enclave, error) {
 		valRaw, err := val.Result()
@@ -162,17 +159,13 @@ func (r *RedisWrapper) GetKey(id string) (any, error) {
 			return nil, err
 		}
 
-		fmt.Println(valRaw)
 		valKey, err := base64.StdEncoding.DecodeString(valRaw)
 
-		fmt.Println(valKey)
 		return memguard.NewEnclave(valKey), err
 	}()
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println(reflect.TypeOf(returnedData))
 
 	return returnedData, nil
 }
@@ -183,7 +176,7 @@ func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration) error
 		return err
 	}
 
-	ret := r.DB.Set(context.Background(), id, keyLocked.Bytes(), *duration)
+	ret := r.DB.Set(context.Background(), id, string(keyLocked.Bytes()), *duration)
 	keyLocked.Destroy()
 
 	if ret.Err() != nil {
@@ -229,7 +222,6 @@ func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error){
 		User: os.Getenv(dbName  + "_USER"),
 	}
 
-	fmt.Println(dbName)
 	p.Pool[dbName] = &sqlWrapper
 
 	return &sqlWrapper, nil
@@ -265,8 +257,12 @@ func (sr *MySQLWrapper) GetKey(id string) (any, error) {
 		return nil, err
 	}
 
+	keySlice, err := hex.DecodeString(string(returnedValue.([]byte)))
+	if err != nil {
+		return nil, err
+	}
 
-	return returnedValue, nil
+	return keySlice, nil
 }
 
 func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration) error {

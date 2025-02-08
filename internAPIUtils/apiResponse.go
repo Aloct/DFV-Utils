@@ -11,7 +11,6 @@ import (
 )
 
 type stdResponse struct {
-	Status  int         `json:"status"`
 	Context string      `json:"context"`
 	Data    interface{} `json:"data,omitempty"`
 }
@@ -19,10 +18,22 @@ type stdResponse struct {
 func WriteJson(w http.ResponseWriter, status int, context string, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(stdResponse{
+	fmt.Println("writing...")
+	fmt.Println(stdResponse{
 		Context: context,
 		Data:    data,
 	})
+	fmt.Println(data)
+	if data != "" {
+		json.NewEncoder(w).Encode(stdResponse{
+			Context: context,
+			Data:    data,
+		})
+	} else {
+		json.NewEncoder(w).Encode(stdResponse{
+			Context: context,
+		})
+	}
 
 	return nil
 }

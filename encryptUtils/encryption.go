@@ -70,7 +70,7 @@ func AesEncryption(plaintext *memguard.Enclave, key *memguard.Enclave) ([]byte, 
 		return nil, err
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintextLocked.Bytes()), nil)
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintextLocked.Bytes(), nil)
 	plaintextLocked.Destroy()
 
 	return ciphertext, nil

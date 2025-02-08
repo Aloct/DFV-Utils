@@ -2,6 +2,7 @@ package encryptUtils
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/awnumar/memguard"
@@ -40,7 +42,7 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 		return nil, err
 	}
 
-	dekEncrypted, err := AesEncryption(kek, dek)
+	dekEncrypted, err := AesEncryption(dek, kek)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +87,6 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 		return nil, err
 	}
 
-	fmt.Println(resData["data"].(string))
 	return &DEKCombKEK{
 		Dek: dekEncrypted,
 		KekDB: kekRefs{
@@ -103,8 +104,6 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 
 func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.Enclave, error) {
 	// get KEK from decryptKEK()
-	fmt.Println("GetDEK")
-	fmt.Println(dbF)
 	kek, err := dc.decryptKEK(dbF, cacheF)
 	if err != nil {
 		return nil, err
@@ -130,9 +129,6 @@ func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.E
 
 		kek = kekRaw.(*memguard.Enclave)
 	} else {
-		fmt.Println(dc.KekDB.KEKID)
-		fmt.Println("decryptKEK")
-		fmt.Println(dbF)
 		keyRaw, err := dbF.GetKey(dc.KekDB.KEKID)
 		if err != nil {
 			return nil, err
@@ -173,12 +169,22 @@ func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.E
 			if err != nil {
 				return nil, err
 			}
+
+			splitted := strings.Split(b64Encoded, ";")
+			b64Raw := splitted[0]
+
+			enclave := memguard.NewEnclave([]byte(b64Raw))
 	
 			// cache key to increase decryption speed
-			cacheF.SetKey(dc.KekDB.KEKID, b64Encoded, &dc.KekDB.CacheDuration)
+			cacheF.SetKey(dc.KekDB.KEKID, enclave, &dc.KekDB.CacheDuration)
 			dc.KekDB.Cached = time.Now()
+
+			b64Decoded, err := base64.StdEncoding.DecodeString(b64Raw)
+			if err != nil {
+				return nil, err
+			}
 	
-			return memguard.NewEnclave([]byte(base64.StdEncoding.EncodeToString([]byte(b64Encoded)))), nil
+			return memguard.NewEnclave(b64Decoded), nil
 		}()
 
 		if err != nil {
@@ -190,7 +196,7 @@ func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.E
 }
 
 func CreateAESKey(keySize int) (*memguard.Enclave, error) {
-	if keySize != 16 && keySize != 24 && keySize != 32 {
+	if keySize != 16 && keySize != 24 && keySize != 32 && keySize != 64 {
 		return nil, errors.New("no valid key byte slice provided")
 	} 
 
@@ -206,10 +212,10 @@ func CreateAESKey(keySize int) (*memguard.Enclave, error) {
 }
 
 func CreateECCKey() (*memguard.Enclave, error) {
-	private, err := CreateAESKey(32)
+	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	return private, nil
+	return memguard.NewEnclave(private), nil
 }
