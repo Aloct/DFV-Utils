@@ -15,15 +15,17 @@ type stdResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+type ErrorContext struct {
+	Status int
+	InternalCode int
+	Message string
+	Data string
+}
+
 func WriteJson(w http.ResponseWriter, status int, context string, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	fmt.Println("writing...")
-	fmt.Println(stdResponse{
-		Context: context,
-		Data:    data,
-	})
-	fmt.Println(data)
+
 	if data != "" {
 		json.NewEncoder(w).Encode(stdResponse{
 			Context: context,
@@ -38,9 +40,16 @@ func WriteJson(w http.ResponseWriter, status int, context string, data interface
 	return nil
 }
 
-func WriteError(w http.ResponseWriter, status int, err error) {
+func WriteError(w http.ResponseWriter, status int, err error, contextData *ErrorContext) {
 	fmt.Fprintln(os.Stderr, err)
-	http.Error(w, err.Error(), status)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	if contextData != nil {
+		json.NewEncoder(w).Encode(contextData)
+	} else {
+		http.Error(w, "failed to process request, no context given", status)
+	}
 
 	// SEND INTO LOG
 }
