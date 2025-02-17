@@ -18,7 +18,6 @@ type stdResponse struct {
 func WriteJson(w http.ResponseWriter, status int, context string, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	fmt.Println("writing...")
 	fmt.Println(stdResponse{
 		Context: context,
 		Data:    data,

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,9 @@ type DEKCombKEK struct {
 type keyFetcher interface {
 	GetKey(id string) (any, error)
 	SetKey(id string, key any, d *time.Duration) error
+
+	GetData(query string, values []any) (any, error)
+	SetData(query string, values []any, n *time.Duration) error
 }
 
 // dek is encrypted via the kek which is referenced by kekRef, passed dek must be unencrypted
@@ -68,7 +72,11 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		time.Sleep(10 * time.Second)
+		res, err = client.Do(req)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if res.StatusCode != http.StatusCreated {
@@ -211,11 +219,13 @@ func CreateAESKey(keySize int) (*memguard.Enclave, error) {
 	return key, nil
 }
 
-func CreateECCKey() (*memguard.Enclave, error) {
-	_, private, err := ed25519.GenerateKey(rand.Reader)
+func CreateECCKey(publicDBStore keyFetcher) (*memguard.Enclave, error) {
+	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
+
+	publicDBStore.SetData("INSERT INTO kstore (id, k_val) VALUES (?, ?)", []any{"1", hex.EncodeToString(public)}, nil)
 
 	return memguard.NewEnclave(private), nil
 }
