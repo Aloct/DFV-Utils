@@ -9,7 +9,7 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-func AesDecryption(ciphertext *memguard.Enclave, key *memguard.Enclave) (*memguard.Enclave, error) { 
+func AesDecryption(ciphertext []byte, key *memguard.Enclave) (*memguard.Enclave, error) { 
 	lockedKey, err := key.Open()
 	if err != nil {
 		return nil, err
@@ -27,30 +27,23 @@ func AesDecryption(ciphertext *memguard.Enclave, key *memguard.Enclave) (*memgua
 	}
 
 	nonceSize := aesGCM.NonceSize()
-	ciphertextLocked, err := ciphertext.Open()
-	if err != nil {
+	if len(ciphertext) < nonceSize {
 		return nil, err
 	}
-
-	ciphertextBytes := ciphertextLocked.Bytes()
-	if len(ciphertextBytes) < nonceSize {
-		return nil, err
-	}
-	nonce, ciphertextRaw := ciphertextBytes[:nonceSize], ciphertextBytes[nonceSize:]
-	ciphertextLocked.Destroy()
+	nonce, ciphertextRaw := ciphertext[:nonceSize], ciphertext[nonceSize:]
 
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertextRaw, nil)
 	if err != nil {
 		return nil, err
 	}
-	toZero(ciphertextRaw)
 
 	plaintextEnclave := memguard.NewEnclave(plaintext)
+	toZero(plaintext)
 
 	return plaintextEnclave, nil
 }
 
-func AesEncryption(plaintext *memguard.Enclave, key *memguard.Enclave) (*memguard.Enclave, error) {
+func AesEncryption(plaintext *memguard.Enclave, key *memguard.Enclave) ([]byte, error) {
 	lockedKey, err := key.Open()
 	if err != nil {
 		return nil, err
@@ -77,8 +70,8 @@ func AesEncryption(plaintext *memguard.Enclave, key *memguard.Enclave) (*memguar
 		return nil, err
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintextLocked.Bytes()), nil)
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintextLocked.Bytes(), nil)
 	plaintextLocked.Destroy()
 
-	return memguard.NewEnclave(ciphertext), nil
+	return ciphertext, nil
 }
