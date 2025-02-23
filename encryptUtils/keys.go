@@ -31,9 +31,6 @@ type DEKCombKEK struct {
 	KekDB kekRefs
 }
 
-type stk func(keyRaw any) ([]byte, error)
-type kts func(keyRaw any) (string, error)
-
 type keyFetcher interface {
 	GetKey(id string, stringToKey interface{}) (any, error)
 	SetKey(id string, key any, d *time.Duration, keyToString interface{}) error
@@ -115,8 +112,8 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 
 func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher, keyToString interface{}, stringToKey interface{}) (*memguard.Enclave, error) {
 	// get KEK from decryptKEK()
-	keyToStringC := keyToString.(kts)
-	stringToKeyC := stringToKey.(stk)
+	keyToStringC := keyToString.(func(keyRaw any) (string, error))
+	stringToKeyC := stringToKey.(func(keyRaw any) ([]byte, error))
 
 	kek, err := dc.decryptKEK(dbF, cacheF, keyToStringC, stringToKeyC)
 	if err != nil {
@@ -131,7 +128,7 @@ func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher, keyToString inte
 	return dek, nil
 }
 
-func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher, keyToString kts, stringToKey stk) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher, keyToString func(keyRaw any) (string, error), stringToKey func(keyRaw any) ([]byte, error)) (*memguard.Enclave, error) {
 	// check if KEK is cached
 	var kek *memguard.Enclave
 
