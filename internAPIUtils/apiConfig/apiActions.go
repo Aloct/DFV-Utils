@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	errorHandler "github.com/Aloct/DFV-Utils/internAPIUtils/errorHandling"
 	"github.com/awnumar/memguard"
 )
 
@@ -37,13 +38,27 @@ func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, string, error) {
 	return enclave, add, nil
 }
 
-func GetStdResponse(r http.Response) (*stdResponse, error) {
+func GetStdResponse(r http.Response) (*StdResponse, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var data stdResponse
+	var data StdResponse
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+
+	return &data, err
+}
+
+func GetErrorResponse(r http.Response) (*errorHandler.HTTPErrorContext, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var data errorHandler.HTTPErrorContext 
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
 	}

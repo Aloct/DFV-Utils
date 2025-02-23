@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -21,7 +20,7 @@ type DBWrapper interface {
 	Connect(ctx context.Context, retrys int) error
 	// RateLimit(ctx context.Context) error
 	// rotatePW(ctx context.Context) error
-	GetData(query string,  values []any) (any, error)
+	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
 	GetKey(id string) (any, error)
 	SetKey(id string, key any, d *time.Duration) error
@@ -32,12 +31,12 @@ type DBPool struct {
 }
 
 type BaseWrapper struct {
-	RateLimitEnabled bool
+	RateLimitEnabled  bool
 	PwRotationEnabled bool
-	Subject string
-	Container string
-	Port int
-	Password string
+	Subject           string
+	Container         string
+	Port              int
+	Password          string
 }
 
 // func (b *BaseWrapper) RateLimit(ctx context.Context) error {
@@ -59,7 +58,7 @@ type BaseWrapper struct {
 type RedisWrapper struct {
 	BaseWrapper
 	DbNum int
-	DB *redis.Client
+	DB    *redis.Client
 }
 
 func NewDBPool() *DBPool {
@@ -94,13 +93,13 @@ func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 	}
 
 	redisClient := RedisWrapper{
-		BaseWrapper: BaseWrapper{			
+		BaseWrapper: BaseWrapper{
 			// RateLimitEnabled: rateLimit,
 			// PwRotationEnabled: pwRotation,
-			Subject: os.Getenv(dbName  + "_SUBJECT"),
-			Container: os.Getenv(dbName  + "_CONTAINER"),
-			Port: dbPort,
-			Password: os.Getenv(dbName  + "_PASSWORD"),
+			Subject:   os.Getenv(dbName + "_SUBJECT"),
+			Container: os.Getenv(dbName + "_CONTAINER"),
+			Port:      dbPort,
+			Password:  os.Getenv(dbName + "_PASSWORD"),
 		},
 		DbNum: dbNum,
 	}
@@ -162,7 +161,7 @@ func (r *RedisWrapper) SetData(query string, values []any, duration *time.Durati
 func (r *RedisWrapper) GetKey(id string) (any, error) {
 	val := r.DB.Get(context.Background(), id)
 
-	returnedData, err := func () (*memguard.Enclave, error) {
+	returnedData, err := func() (*memguard.Enclave, error) {
 		valRaw, err := val.Result()
 		if err != nil {
 			return nil, err
@@ -195,20 +194,18 @@ func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration) error
 	return nil
 }
 
-
 type MongoWrapper struct {
 	BaseWrapper
 }
 
-
 type MySQLWrapper struct {
 	BaseWrapper
-	DB *sql.DB
+	DB     *sql.DB
 	DBname string
-	User string
+	User   string
 }
 
-func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error){
+func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error) {
 	if p.Pool[dbName] != nil {
 		err := p.Pool[dbName].Connect(context.Background(), 2)
 		if err != nil {
@@ -222,13 +219,13 @@ func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error){
 		BaseWrapper: BaseWrapper{
 			// RateLimitEnabled: rateLimit,
 			// PwRotationEnabled: pwRotation,
-			Subject: os.Getenv(dbName  + "_SUBJECT"),
-			Container: os.Getenv(dbName  + "_CONTAINER"),
-			Port: 3306,
-			Password: os.Getenv(dbName  + "_PASSWORD"),
+			Subject:   os.Getenv(dbName + "_SUBJECT"),
+			Container: os.Getenv(dbName + "_CONTAINER"),
+			Port:      3306,
+			Password:  os.Getenv(dbName + "_PASSWORD"),
 		},
-		DBname: os.Getenv(dbName  + "_NAME"),
-		User: os.Getenv(dbName  + "_USER"),
+		DBname: os.Getenv(dbName + "_NAME"),
+		User:   os.Getenv(dbName + "_USER"),
 	}
 
 	p.Pool[dbName] = &sqlWrapper
@@ -295,37 +292,54 @@ func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration) error {
 
 // expectedDts: map[string]any
 func (sr *MySQLWrapper) GetData(query string, values []any) (any, error) {
+	// Log the query and values
+	fmt.Println("Executing query:", query)
+	fmt.Println("With values:", values)
+
 	rows, err := sr.DB.Query(query, values...)
 	if err != nil {
+		fmt.Println("Error executing query:", err)
 		return nil, err
 	}
 	defer rows.Close()
 
-	if !rows.Next() {
-		return nil, errors.New("failed to get data (no match in db)")
-	}
-
 	columns, err := rows.Columns()
 	if err != nil {
+		fmt.Println("Error getting columns:", err)
 		return nil, err
 	}
 
 	returnedMap := make(map[int]map[string]any)
-	uncastedRowValues := make([]any, len(columns))
-	emptyMap := make(map[string]any)
+	// uncastedRowValues := make([]any, len(columns))
 
+	valuePtrs := make([]any, len(columns))
+	uncastedRowValues := make([]any, len(columns))
+	for i := range values {
+		uncastedRowValues[i] = &valuePtrs[i]
+	}	
+
+	counter := 0;
 	for rows.Next() {
+		emptyMap := make(map[string]any)
+
 		if err := rows.Scan(uncastedRowValues...); err != nil {
+			fmt.Println("Error scanning row:", err)
 			return nil, err
 		}
 
 		for i, v := range columns {
-			emptyMap[v] = uncastedRowValues[i]
+			fmt.Println("IN SCAN")
+			fmt.Println(v, i)
+			emptyMap[v] = *uncastedRowValues[i].(*interface{})
+			fmt.Println(emptyMap)
+			fmt.Println(uncastedRowValues...)
 		}
 
-		returnedMap[uncastedRowValues[0].(int)] = emptyMap 
+		returnedMap[counter] = emptyMap
+		counter++;
 	}
 
+	fmt.Println("Query result:", returnedMap)
 	return returnedMap, nil
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-type stdResponse struct {
+type StdResponse struct {
 	Context string      `json:"context"`
 	Data    interface{} `json:"data,omitempty"`
 }
@@ -19,12 +19,12 @@ func WriteJson(w http.ResponseWriter, status int, context string, data interface
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if data != "" {
-		json.NewEncoder(w).Encode(stdResponse{
+		json.NewEncoder(w).Encode(StdResponse{
 			Context: context,
 			Data:    data,
 		})
 	} else {
-		json.NewEncoder(w).Encode(stdResponse{
+		json.NewEncoder(w).Encode(StdResponse{
 			Context: context,
 		})
 	}
@@ -40,10 +40,8 @@ func WriteError(w http.ResponseWriter, status int, err error, internalCode int, 
 	if internalCode != 0 {
 		errorContext, err := errorHandler.CreateHTTPError(internalCode, context, addInfo)
 		if err != nil {
-			if err != nil {
-				http.Error(w, "failed to process request, no context given", status)
-				return err
-			}
+			http.Error(w, "failed to process request, no context given", status)
+			return err
 		}
 
 		json.NewEncoder(w).Encode(errorContext)
