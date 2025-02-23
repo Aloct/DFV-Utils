@@ -14,8 +14,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type stk func(keyRaw any) ([]byte, error)
-type kts func(keyRaw any) (string, error)
 
 
 type DBWrapper interface {
@@ -169,7 +167,7 @@ func (r *RedisWrapper) GetKey(id string, stringToKey interface{}) (any, error) {
 			return nil, err
 		}
 
-		valKey, err := (stringToKey.(stk))(valRaw)
+		valKey, err := (stringToKey.(func(keyRaw any) ([]byte, error)))(valRaw)
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +188,7 @@ func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration, keyTo
 	}
 
 	ret, err := func() (*redis.StatusCmd, error) {
-		keyString, err := (keyToString.(kts))(keyLocked.Bytes())
+		keyString, err := (keyToString.(func(keyRaw any) (string, error)))(keyLocked.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +288,7 @@ func (sr *MySQLWrapper) GetKey(id string, stringToKey interface{}) (any, error) 
 		return nil, err
 	}
 
-	keySlice, err := (stringToKey.(stk))(returnedValue)
+	keySlice, err := (stringToKey.(func(keyRaw any) ([]byte, error)))(returnedValue)
 	// keySlice, err := hex.DecodeString(string(returnedValue.([]byte)))
 	if err != nil {
 		return nil, err
@@ -301,7 +299,7 @@ func (sr *MySQLWrapper) GetKey(id string, stringToKey interface{}) (any, error) 
 
 // key is not handled in a enclave cause its already encrypted
 func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration, keyToString interface{}) error {
-	keyString, err := (keyToString.(kts))(key)
+	keyString, err := (keyToString.(func(keyRaw any) (string, error)))(key)
 	if err != nil {
 		return err
 	}
