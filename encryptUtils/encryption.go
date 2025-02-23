@@ -38,6 +38,7 @@ func AesDecryption(ciphertext []byte, key *memguard.Enclave) (*memguard.Enclave,
 	}
 
 	plaintextEnclave := memguard.NewEnclave(plaintext)
+	
 	toZero(plaintext)
 
 	return plaintextEnclave, nil
