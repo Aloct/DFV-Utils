@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"time"
@@ -19,7 +18,7 @@ import (
 )
 
 type DBWrapper interface {
-	Connect(ctx context.Context) error
+	Connect(ctx context.Context, retrys int) error
 	// RateLimit(ctx context.Context) error
 	// rotatePW(ctx context.Context) error
 	GetData(query string,  values []any) (any, error)
@@ -71,7 +70,7 @@ func NewDBPool() *DBPool {
 
 func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 	if p.Pool[dbName] != nil {
-		err := p.Pool[dbName].Connect(context.Background())
+		err := p.Pool[dbName].Connect(context.Background(), 2)
 		if err != nil {
 			return nil, err
 		}
@@ -111,18 +110,28 @@ func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 	return &redisClient, err
 }
 
-func (r *RedisWrapper) Connect(ctx context.Context) error {
-	rdb := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%d", r.Container, r.Port), 
-		Password: "", 
-		DB: r.DbNum,
-	})
+func (r *RedisWrapper) Connect(ctx context.Context, retrys int) error {
+	var rdb *redis.Client
+	var err error
+	for i := 0; i < retrys; i++ {
+		rdb = redis.NewClient(&redis.Options{
+			Addr: fmt.Sprintf("%s:%d", r.Container, r.Port), 
+			Password: "", 
+			DB: r.DbNum,
+		})
+	
+		_, err = rdb.Ping(context.Background()).Result()
 
-	_, err := rdb.Ping(context.Background()).Result()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		log.Fatalf("Redis connection failed %v", err)
+		if err == nil {
+			i = retrys
+		} else {
+			time.Sleep(time.Second * 5)
+		}
 	}
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("Connected to " + r.Container)
 
 	r.DB = rdb
@@ -176,7 +185,7 @@ func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration) error
 		return err
 	}
 
-	ret := r.DB.Set(context.Background(), id, keyLocked.Bytes(), *duration)
+	ret := r.DB.Set(context.Background(), id, string(keyLocked.Bytes()), *duration)
 	keyLocked.Destroy()
 
 	if ret.Err() != nil {
@@ -201,7 +210,7 @@ type MySQLWrapper struct {
 
 func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error){
 	if p.Pool[dbName] != nil {
-		err := p.Pool[dbName].Connect(context.Background())
+		err := p.Pool[dbName].Connect(context.Background(), 2)
 		if err != nil {
 			return nil, err
 		}
@@ -227,8 +236,18 @@ func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error){
 	return &sqlWrapper, nil
 }
 
-func (sr *MySQLWrapper) Connect(ctx context.Context) error {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", sr.User, sr.Password, sr.Container, sr.Port, sr.DBname))
+func (sr *MySQLWrapper) Connect(ctx context.Context, retrys int) error {
+	var err error
+	var db *sql.DB
+	for i := 0; i < retrys; i++ {
+		db, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", sr.User, sr.Password, sr.Container, sr.Port, sr.DBname))
+
+		if err == nil {
+			i = retrys
+		} else {
+			time.Sleep(time.Second * 5)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -257,7 +276,7 @@ func (sr *MySQLWrapper) GetKey(id string) (any, error) {
 		return nil, err
 	}
 
-	keySlice, err := hex.DecodeString(returnedValue.(string))
+	keySlice, err := hex.DecodeString(string(returnedValue.([]byte)))
 	if err != nil {
 		return nil, err
 	}
