@@ -31,9 +31,12 @@ type DEKCombKEK struct {
 	KekDB kekRefs
 }
 
+type stk func(keyRaw any) ([]byte, error)
+type kts func(keyRaw any) (string, error)
+
 type keyFetcher interface {
-	GetKey(id string) (any, error)
-	SetKey(id string, key any, d *time.Duration) error
+	GetKey(id string, stringToKey interface{}) (any, error)
+	SetKey(id string, key any, d *time.Duration, keyToString interface{}) error
 
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, n *time.Duration) error
@@ -110,9 +113,12 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 
 // https://developer.ibm.com/tutorials/docker-dev-db/
 
-func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher, keyToString interface{}, stringToKey interface{}) (*memguard.Enclave, error) {
 	// get KEK from decryptKEK()
-	kek, err := dc.decryptKEK(dbF, cacheF)
+	keyToStringC := keyToString.(kts)
+	stringToKeyC := stringToKey.(stk)
+
+	kek, err := dc.decryptKEK(dbF, cacheF, keyToStringC, stringToKeyC)
 	if err != nil {
 		return nil, err
 	}
@@ -125,19 +131,19 @@ func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.Encla
 	return dek, nil
 }
 
-func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher, keyToString kts, stringToKey stk) (*memguard.Enclave, error) {
 	// check if KEK is cached
 	var kek *memguard.Enclave
 
 	if time.Since(dc.KekDB.Cached) < dc.KekDB.CacheDuration {
-		kekRaw, err := cacheF.GetKey(dc.KekDB.KEKID)
+		kekRaw, err := cacheF.GetKey(dc.KekDB.KEKID, stringToKey)
 		if err != nil {
 			return nil, err
 		}
 
 		kek = kekRaw.(*memguard.Enclave)
 	} else {
-		keyRaw, err := dbF.GetKey(dc.KekDB.KEKID)
+		keyRaw, err := dbF.GetKey(dc.KekDB.KEKID, stringToKey)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +190,7 @@ func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher) (*memguard.E
 			enclave := memguard.NewEnclave([]byte(b64Raw))
 
 			// cache key to increase decryption speed
-			cacheF.SetKey(dc.KekDB.KEKID, enclave, &dc.KekDB.CacheDuration)
+			cacheF.SetKey(dc.KekDB.KEKID, enclave, &dc.KekDB.CacheDuration, keyToString)
 			dc.KekDB.Cached = time.Now()
 
 			b64Decoded, err := base64.StdEncoding.DecodeString(b64Raw)

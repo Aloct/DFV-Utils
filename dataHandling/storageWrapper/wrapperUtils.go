@@ -3,8 +3,6 @@ package wrapperUtils
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -16,14 +14,18 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type stk func(keyRaw any) ([]byte, error)
+type kts func(keyRaw any) (string, error)
+
+
 type DBWrapper interface {
 	Connect(ctx context.Context, retrys int) error
 	// RateLimit(ctx context.Context) error
 	// rotatePW(ctx context.Context) error
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
-	GetKey(id string) (any, error)
-	SetKey(id string, key any, d *time.Duration) error
+	GetKey(id string, stringToKey interface{}) (any, error)
+	SetKey(id string, key any, d *time.Duration, keyToString interface{}) error
 }
 
 type DBPool struct {
@@ -158,7 +160,7 @@ func (r *RedisWrapper) SetData(query string, values []any, duration *time.Durati
 	return nil
 }
 
-func (r *RedisWrapper) GetKey(id string) (any, error) {
+func (r *RedisWrapper) GetKey(id string, stringToKey interface{}) (any, error) {
 	val := r.DB.Get(context.Background(), id)
 
 	returnedData, err := func() (*memguard.Enclave, error) {
@@ -167,7 +169,10 @@ func (r *RedisWrapper) GetKey(id string) (any, error) {
 			return nil, err
 		}
 
-		valKey, err := base64.StdEncoding.DecodeString(valRaw)
+		valKey, err := (stringToKey.(stk))(valRaw)
+		if err != nil {
+			return nil, err
+		}
 
 		return memguard.NewEnclave(valKey), err
 	}()
@@ -178,14 +183,25 @@ func (r *RedisWrapper) GetKey(id string) (any, error) {
 	return returnedData, nil
 }
 
-func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration) error {
+func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration, keyToString interface{}) error {
 	keyLocked, err := key.(*memguard.Enclave).Open()
 	if err != nil {
 		return err
 	}
 
-	ret := r.DB.Set(context.Background(), id, string(keyLocked.Bytes()), *duration)
+	ret, err := func() (*redis.StatusCmd, error) {
+		keyString, err := (keyToString.(kts))(keyLocked.Bytes())
+		if err != nil {
+			return nil, err
+		}
+
+		return r.DB.Set(context.Background(), id, keyString, *duration), nil
+	}()
 	keyLocked.Destroy()
+
+	if err != nil {
+		return err
+	}
 
 	if ret.Err() != nil {
 		return ret.Err()
@@ -265,15 +281,17 @@ func (sr *MySQLWrapper) Close() error {
 	return nil
 }
 
-// key is stored encrypted in its raw form (no b64 encoding etc.)
-func (sr *MySQLWrapper) GetKey(id string) (any, error) {
+
+// key is not handled in a enclave cause its already encrypted
+func (sr *MySQLWrapper) GetKey(id string, stringToKey interface{}) (any, error) {
 	var returnedValue any
 	err := sr.DB.QueryRow("SELECT k_val FROM kstore WHERE id = ?", id).Scan(&returnedValue)
 	if err != nil {
 		return nil, err
 	}
 
-	keySlice, err := hex.DecodeString(string(returnedValue.([]byte)))
+	keySlice, err := (stringToKey.(stk))(returnedValue)
+	// keySlice, err := hex.DecodeString(string(returnedValue.([]byte)))
 	if err != nil {
 		return nil, err
 	}
@@ -281,8 +299,14 @@ func (sr *MySQLWrapper) GetKey(id string) (any, error) {
 	return keySlice, nil
 }
 
-func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration) error {
-	_, err := sr.DB.Exec("INSERT INTO kstore (id, k_val) VALUES (?, ?)", key.(string))
+// key is not handled in a enclave cause its already encrypted
+func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration, keyToString interface{}) error {
+	keyString, err := (keyToString.(kts))(key)
+	if err != nil {
+		return err
+	}
+
+	_, err = sr.DB.Exec("INSERT INTO kstore (id, k_val) VALUES (?, ?)", keyString)
 	if err != nil {
 		return err
 	}
