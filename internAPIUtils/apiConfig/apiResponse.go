@@ -1,25 +1,18 @@
-package internAPIUtils
+package apiConfig
 
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
-	"os"
 
+	errorHandler "github.com/Aloct/DFV-Utils/internAPIUtils/errorHandling"
 	"github.com/awnumar/memguard"
 )
 
 type stdResponse struct {
 	Context string      `json:"context"`
 	Data    interface{} `json:"data,omitempty"`
-}
-
-type ErrorContext struct {
-	Status int
-	InternalCode int
-	Message string
-	Data string
 }
 
 func WriteJson(w http.ResponseWriter, status int, context string, data interface{}) error {
@@ -39,24 +32,35 @@ func WriteJson(w http.ResponseWriter, status int, context string, data interface
 	return nil
 }
 
-func WriteError(w http.ResponseWriter, status int, err error, contextData *ErrorContext) {
-	fmt.Fprintln(os.Stderr, err)
+func WriteError(w http.ResponseWriter, status int, err error, internalCode int, context string, addInfo string) error {
+	log.Println("Error:", err)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
-	if contextData != nil {
-		json.NewEncoder(w).Encode(contextData)
+	if internalCode != 0 {
+		errorContext, err := errorHandler.CreateHTTPError(internalCode, context, addInfo)
+		if err != nil {
+			if err != nil {
+				http.Error(w, "failed to process request, no context given", status)
+				return err
+			}
+		}
+
+		json.NewEncoder(w).Encode(errorContext)
 	} else {
 		http.Error(w, "failed to process request, no context given", status)
 	}
 
+	return nil
+
 	// SEND INTO LOG
+
 }
 
 func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave, add string) error {
 	w.Header().Set("Content-Type", "application/json")
 
-	lockedBuffer, err  := key.Open()
+	lockedBuffer, err := key.Open()
 	if err != nil {
 		return err
 	}

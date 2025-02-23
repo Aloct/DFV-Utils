@@ -1,4 +1,4 @@
-package internAPIUtils
+package apiConfig
 
 import (
 	"encoding/base64"
