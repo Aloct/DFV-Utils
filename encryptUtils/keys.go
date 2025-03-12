@@ -217,7 +217,7 @@ func CreateAESKey(keySize int) (*memguard.Enclave, error) {
 	}
 
 	key := memguard.NewEnclave(keyRaw)
-	toZero(keyRaw)
+	ToZero(keyRaw)
 
 	return key, nil
 }

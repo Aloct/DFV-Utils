@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func toZero(byteSlice []byte) {
+func ToZero(byteSlice []byte) {
 	for i := range byteSlice {
 		byteSlice[i] = 0
 	}

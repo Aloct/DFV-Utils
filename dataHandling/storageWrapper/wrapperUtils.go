@@ -23,8 +23,8 @@ type DBWrapper interface {
 	// rotatePW(ctx context.Context) error
 	GetData(query string,  values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
-	GetKey(id string, stringToKey interface{}) (any, error)
-	SetKey(id string, key any, d *time.Duration, keyToString interface{}) error
+	GetKey(id string, individualref string, stringToKey interface{}) (any, error)
+	SetKey(id string, individualref string, version string, key any, d *time.Duration, keyToString interface{}) error
 }
 
 type DBPool struct {
@@ -159,8 +159,15 @@ func (r *RedisWrapper) SetData(query string, values []any, duration *time.Durati
 	return nil
 }
 
-func (r *RedisWrapper) GetKey(id string, stringToKey interface{}) (any, error) {
-	val := r.DB.Get(context.Background(), id)
+func (r *RedisWrapper) GetKey(id string, individualref string, stringToKey interface{}) (any, error) {
+	var identifier string
+	if (individualref != "") {
+		identifier = individualref
+	} else {
+		identifier = id
+	}
+
+	val := r.DB.Get(context.Background(), identifier)
 
 	returnedData, err := func () (*memguard.Enclave, error) {
 		valRaw, err := val.Result()
@@ -182,7 +189,7 @@ func (r *RedisWrapper) GetKey(id string, stringToKey interface{}) (any, error) {
 	return returnedData, nil
 }
 
-func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration, keyToString interface{}) error {
+func (r *RedisWrapper) SetKey(id string, individualref string, version string, key any, duration *time.Duration, keyToString interface{}) error {
 	keyLocked, err := key.(*memguard.Enclave).Open()
 	if err != nil {
 		return err
@@ -194,7 +201,14 @@ func (r *RedisWrapper) SetKey(id string, key any, duration *time.Duration, keyTo
 			return nil, err
 		}
 
-		return r.DB.Set(context.Background(), id, keyString, *duration), nil
+		var identifier string
+		if (individualref != "") {
+			identifier = individualref
+		} else {
+			identifier = id
+		}
+
+		return r.DB.Set(context.Background(), identifier, keyString, *duration), nil
 	}()
 	keyLocked.Destroy()
 
@@ -284,9 +298,18 @@ func (sr *MySQLWrapper) Close() error {
 
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) GetKey(id string, stringToKey interface{}) (any, error) {
+func (sr *MySQLWrapper) GetKey(id string, individualref string, stringToKey interface{}) (any, error) {
+	var identifier, key string
+	if individualref == "" {
+		identifier = id
+		key = "id"
+	} else {
+		identifier = individualref
+		key = "individualref"
+	}
+
 	var returnedValue any
-	err := sr.DB.QueryRow("SELECT k_val FROM kstore WHERE id = ?", id).Scan(&returnedValue)
+	err := sr.DB.QueryRow(fmt.Sprintf("SELECT k_val FROM kstore WHERE %s = ?", key), identifier).Scan(&returnedValue)
 	if err != nil {
 		return nil, err
 	}
@@ -301,13 +324,13 @@ func (sr *MySQLWrapper) GetKey(id string, stringToKey interface{}) (any, error) 
 }
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration, keyToString interface{}) error {
+func (sr *MySQLWrapper) SetKey(id string, version string, individualref string, key any, d *time.Duration, keyToString interface{}) error {
 	keyString, err := (keyToString.(func(keyRaw any) (string, error)))(key)
 	if err != nil {
 		return err
 	}
 
-	_, err = sr.DB.Exec("INSERT INTO kstore (id, k_val) VALUES (?, ?)", keyString)
+	_, err = sr.DB.Exec("INSERT INTO kstore (uniqueid, individualref, vers, k_val) VALUES (?, ?, ?, ?)", id, individualref, version, keyString)
 	if err != nil {
 		return err
 	}
@@ -359,6 +382,15 @@ func (sr *MySQLWrapper) SetData(query string, values []any, n *time.Duration) er
 
 	// audit relevant
 	fmt.Println(result)
+
+	return nil
+}
+
+func (sr *MySQLWrapper) RemoveData(key string, value string) error {
+	_, err := sr.DB.Exec(fmt.Sprintf("DELETE FROM kstore WHERE %s = ?", key), value)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
