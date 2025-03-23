@@ -1,9 +1,4 @@
 package apiConfig
-
-import (
-	"net/http"
-)
-
 // internal payload types
 // 7001 - simpleType
 // 7010 - keyIdentComb
@@ -14,15 +9,26 @@ type stdResponse struct {
 }
 
 // complex structs for Data field
+type responseCreator struct{}
+
+func NewResponseCreator() responseCreator {
+	return responseCreator{}
+}
+
 type PasetoIdentifier struct {
 	KEK string `json:"kek"`
 	KEKDB string `json:"kekdb"`
 	ID string `json:"id"`
 }
 
-func NewPasetoIdentifier(w http.ResponseWriter, kek string, kekdb, id, userref string) PasetoIdentifier {
-	w.Header().Set("internalDataCode", "7010")
+func (responseCreator) NewStdResponse(context string, data interface{}) interface{} {
+	return stdResponse{
+		Context: context,
+		Data:    data,
+	}
+}
 
+func (responseCreator) NewPasetoIdentifier(kek, kekdb, id string) interface{} {
 	return PasetoIdentifier{
 		KEK:  kek,
 		KEKDB: kekdb,
