@@ -31,8 +31,6 @@ type DBPool struct {
 }
 
 type BaseWrapper struct {
-	RateLimitEnabled  bool
-	PwRotationEnabled bool
 	Subject           string
 	Container         string
 	Port              int
@@ -67,7 +65,7 @@ func NewDBPool() *DBPool {
 	}
 }
 
-func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
+func (p *DBPool) NewRedisWrapper(dbName string, cron map[string]string) (*RedisWrapper, error) {
 	if p.Pool[dbName] != nil {
 		err := p.Pool[dbName].Connect(context.Background(), 2)
 		if err != nil {
@@ -94,8 +92,6 @@ func (p *DBPool) NewRedisWrapper(dbName string) (*RedisWrapper, error) {
 
 	redisClient := RedisWrapper{
 		BaseWrapper: BaseWrapper{
-			// RateLimitEnabled: rateLimit,
-			// PwRotationEnabled: pwRotation,
 			Subject:   os.Getenv(dbName + "_SUBJECT"),
 			Container: os.Getenv(dbName + "_CONTAINER"),
 			Port:      dbPort,
@@ -304,7 +300,7 @@ func (sr *MySQLWrapper) SetKey(id string, key any, d *time.Duration, keyToString
 		return err
 	}
 
-	_, err = sr.DB.Exec("INSERT INTO kstore (id, k_val) VALUES (?, ?)", keyString)
+	_, err = sr.DB.Exec("INSERT INTO kstore (id, k_val) VALUES (?, ?)", id, keyString)
 	if err != nil {
 		return err
 	}
