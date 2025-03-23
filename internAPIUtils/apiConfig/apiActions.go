@@ -5,46 +5,55 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 
 	errorHandler "github.com/Aloct/DFV-Utils/internAPIUtils/errorHandling"
 	"github.com/awnumar/memguard"
 )
 
-func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, string, error) {
+func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer r.Body.Close()
 
 	var b64Encoded string
 	err = json.Unmarshal(body, &b64Encoded)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	splitted := strings.Split(b64Encoded, ";")
-
-	keyPart, add := splitted[0], splitted[1]
-
-	decodedBytes, err := base64.StdEncoding.DecodeString(keyPart)
+	decodedBytes, err := base64.StdEncoding.DecodeString(b64Encoded)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	enclave := memguard.NewEnclave(decodedBytes)
 
-	return enclave, add, nil
+	return enclave, nil
 }
 
-func GetStdResponse(r http.Response) (*StdResponse, error) {
+func GetJSONFromResponse(r http.Response) (*stdResponse, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var data StdResponse
+	var data stdResponse
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+
+	return &data, err
+}
+
+func GetJSONFromRequest(r *http.Request) (*stdResponse, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var data stdResponse
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package apiConfig
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -10,23 +11,26 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-type StdResponse struct {
-	Context string      `json:"context"`
-	Data    interface{} `json:"data,omitempty"`
+func WriteSuccessResponse(w http.ResponseWriter, status int, context string) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(stdResponse{
+		Context: context,
+	})
+
+	return nil
 }
 
-func WriteJson(w http.ResponseWriter, status int, context string, data interface{}) error {
+func WriteJSONResponse(w http.ResponseWriter, status int, context string, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if data != "" {
-		json.NewEncoder(w).Encode(StdResponse{
+		json.NewEncoder(w).Encode(stdResponse{
 			Context: context,
 			Data:    data,
 		})
 	} else {
-		json.NewEncoder(w).Encode(StdResponse{
-			Context: context,
-		})
+		return errors.New("no data given")
 	}
 
 	return nil
@@ -55,7 +59,7 @@ func WriteError(w http.ResponseWriter, status int, err error, internalCode int, 
 
 }
 
-func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave, add string) error {
+func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave) error {
 	w.Header().Set("Content-Type", "application/json")
 
 	lockedBuffer, err := key.Open()
@@ -65,8 +69,6 @@ func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave, add string) 
 	defer lockedBuffer.Destroy()
 
 	b64Encoded := base64.StdEncoding.EncodeToString(lockedBuffer.Bytes())
-
-	b64Encoded = b64Encoded + ";" + add
 
 	json.NewEncoder(w).Encode(b64Encoded)
 

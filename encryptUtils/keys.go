@@ -32,15 +32,20 @@ type DEKCombKEK struct {
 }
 
 type keyFetcher interface {
-	GetKey(id string, stringToKey interface{}) (any, error)
-	SetKey(id string, key any, d *time.Duration, keyToString interface{}) error
+	GetKey(id string, individualref string, stringToKey interface{}) (any, error)
+	SetKey(id string, version string, individualref string, key any, d *time.Duration, keyToString interface{}) error
 
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, n *time.Duration) error
 }
 
+type responseCreator interface {
+	NewPasetoIdentifier(kek, kekdb, id string) interface{}
+	NewStdResponse(context string, data interface{}) interface{}
+}
+
 // dek is encrypted via the kek which is referenced by kekRef, passed dek must be unencrypted
-func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cacheDuration time.Duration, managerC string, managerP int) (*DEKCombKEK, error) {
+func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cacheDuration time.Duration, managerC string, managerP int, resCreate responseCreator) (*DEKCombKEK, error) {
 	kek, err := CreateAESKey(32)
 	if err != nil {
 		return nil, err
@@ -57,22 +62,35 @@ func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cach
 	}
 	defer keyBuf.Destroy()
 
-	jsonData, err := json.Marshal(base64.StdEncoding.EncodeToString(keyBuf.Bytes()) + ";" + kekDB)
+	keyString, err := KeyToString(keyBuf.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s:%d/registerKEK", managerC, managerP), bytes.NewBuffer(jsonData))
+	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewPasetoIdentifier(keyString, kekDB, "")))
+	if err != nil {
+		return nil, err
+	}
+	
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s:%d/registerKEK", managerC, managerP), bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
+	fmt.Println("TRY")
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		time.Sleep(10 * time.Second)
+		fmt.Println("RETRY")
+		req, err = http.NewRequest("POST", fmt.Sprintf("https://%s:%d/registerKEK", managerC, managerP), bytes.NewReader(jsonData))
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Add("Content-Type", "application/json")
 		res, err = client.Do(req)
 		if err != nil {
 			return nil, err
@@ -133,14 +151,14 @@ func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher, keyToString 
 	var kek *memguard.Enclave
 
 	if time.Since(dc.KekDB.Cached) < dc.KekDB.CacheDuration {
-		kekRaw, err := cacheF.GetKey(dc.KekDB.KEKID, stringToKey)
+		kekRaw, err := cacheF.GetKey(dc.KekDB.KEKID, "", stringToKey)
 		if err != nil {
 			return nil, err
 		}
 
 		kek = kekRaw.(*memguard.Enclave)
 	} else {
-		keyRaw, err := dbF.GetKey(dc.KekDB.KEKID, stringToKey)
+		keyRaw, err := dbF.GetKey(dc.KekDB.KEKID, "", stringToKey)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +205,7 @@ func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher, keyToString 
 			enclave := memguard.NewEnclave([]byte(b64Raw))
 
 			// cache key to increase decryption speed
-			cacheF.SetKey(dc.KekDB.KEKID, enclave, &dc.KekDB.CacheDuration, keyToString)
+			cacheF.SetKey(dc.KekDB.KEKID, "v1", "", enclave, &dc.KekDB.CacheDuration, keyToString)
 			dc.KekDB.Cached = time.Now()
 
 			b64Decoded, err := base64.StdEncoding.DecodeString(b64Raw)
@@ -217,7 +235,7 @@ func CreateAESKey(keySize int) (*memguard.Enclave, error) {
 	}
 
 	key := memguard.NewEnclave(keyRaw)
-	toZero(keyRaw)
+	ToZero(keyRaw)
 
 	return key, nil
 }

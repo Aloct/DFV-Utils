@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"fmt"
 	"io"
 
 	"github.com/awnumar/memguard"
@@ -39,7 +40,7 @@ func AesDecryption(ciphertext []byte, key *memguard.Enclave) (*memguard.Enclave,
 
 	plaintextEnclave := memguard.NewEnclave(plaintext)
 	
-	toZero(plaintext)
+	ToZero(plaintext)
 
 	return plaintextEnclave, nil
 }
@@ -70,6 +71,9 @@ func AesEncryption(plaintext *memguard.Enclave, key *memguard.Enclave) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("KEK UNENCRYPTED BEFORE STORING")
+	fmt.Println(plaintextLocked.Bytes())
 
 	ciphertext := aesGCM.Seal(nonce, nonce, plaintextLocked.Bytes(), nil)
 	plaintextLocked.Destroy()
