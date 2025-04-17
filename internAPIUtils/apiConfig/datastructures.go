@@ -31,11 +31,12 @@ type KEKRegister struct {
 	KeyBlind string `json:"keyblind"`
 }
 
-func (*responseCreator) NewKEKRegister(kek, kekdb, scope, userBlind, keyBlind string) interface{} {
+func (*responseCreator) NewKEKRegister(kek, kekdb, scope, id, userBlind, keyBlind string) interface{} {
 	return KEKRegister{
 		KEK:  kek,
 		KEKDB: kekdb,
 		Scope: scope,
+		ID: id,
 		UserBlind: userBlind,
 		KeyBlind: keyBlind,
 	}
