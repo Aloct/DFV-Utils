@@ -291,23 +291,13 @@ func (sr *MySQLWrapper) Close() error {
 
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) GetKey(id, individualRelation, keyRelation string, stringToKey interface{}) (any, error) {
-	var identifier, key string
-	if individualRelation != "" {
-		identifier = individualRelation
-		key = "id"
-	} else if id != ""  {
-		identifier = id
-		key = "individualrelation"
-	} else if keyRelation != "" {
-		identifier = keyRelation
-		key = "keyrelation"
-	} else {
-		return nil, fmt.Errorf("no identifier provided")
+func (sr *MySQLWrapper) GetKey(id, idType string, stringToKey interface{}) (any, error) {
+	if (id != "keyRelation" && id != "individualRelation" && id != "uniqueID") {
+		return nil, fmt.Errorf("invalid id type")
 	}
 
 	var returnedValue any
-	err := sr.DB.QueryRow(fmt.Sprintf("SELECT k_val FROM kstore WHERE %s = ?", key), identifier).Scan(&returnedValue)
+	err := sr.DB.QueryRow(fmt.Sprintf("SELECT k_val FROM kstore WHERE %s = ?", idType), id).Scan(&returnedValue)
 	if err != nil {
 		return nil, err
 	}
