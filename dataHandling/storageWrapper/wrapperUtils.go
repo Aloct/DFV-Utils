@@ -291,14 +291,19 @@ func (sr *MySQLWrapper) Close() error {
 
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) GetKey(id string, individualref string, stringToKey interface{}) (any, error) {
+func (sr *MySQLWrapper) GetKey(id, individualRelation, keyRelation string, stringToKey interface{}) (any, error) {
 	var identifier, key string
-	if individualref == "" {
-		identifier = id
+	if individualRelation != "" {
+		identifier = individualRelation
 		key = "id"
+	} else if id != ""  {
+		identifier = id
+		key = "individualrelation"
+	} else if keyRelation != "" {
+		identifier = keyRelation
+		key = "keyrelation"
 	} else {
-		identifier = individualref
-		key = "individualref"
+		return nil, fmt.Errorf("no identifier provided")
 	}
 
 	var returnedValue any

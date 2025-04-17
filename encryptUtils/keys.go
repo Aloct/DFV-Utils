@@ -40,7 +40,7 @@ type DEKCombKEK struct {
 }
 
 type keyFetcher interface {
-	GetKey(id string, individualref string, stringToKey interface{}) (any, error)
+	GetKey(id, individualRelation, keyRelation string, stringToKey interface{}) (any, error)
 	SetKey(id string, version string, individualref string, key any, d *time.Duration, keyToString interface{}) error
 
 	GetData(query string, values []any) (any, error)
@@ -104,11 +104,11 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator) error {
 
 	userBlind, err := CreateKeyBlind(serviceMasterSalt, dc.Scope, "KEK")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	keyBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, "0", "KEK")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewKEKRegister(keyString, dc.KEKInfos.DB, dc.Scope, userBlind, keyBlind)))
@@ -170,20 +170,24 @@ func (dc *DEKCombKEK) RegisterNewDEK(individualRef string) error {
 		}
 	}
 	
+	return nil
 }
 
 // retrieve decrypted DEK to handle Data
-func (dc *DEKCombKEK) GetDEK(uniqueID, individualRef string, dbF keyFetcher, stringToKey interface{}, resCreate responseCreator) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) GetDEK(uniqueID, individualRelation, keyRelation string, dbF keyFetcher, stringToKey interface{}, resCreate responseCreator) (*memguard.Enclave, error) {
 	// get KEK from decryptKEK()
-	stringToKeyC := stringToKey.(func(keyRaw any) ([]byte, error))
+	stringToKeyC, ok := stringToKey.(func(keyRaw any) ([]byte, error))
+	if !ok {
+		return nil, errors.New("invalid stringToKey function provided")
+	}
 
 	// get DEK and retrieve information to get related KEK 
-	dekRaw, err := dbF.GetKey(uniqueID, individualRef, stringToKeyC)
+	dekRaw, err := dbF.GetKey(uniqueID, individualRelation, keyRelation, stringToKeyC)
 	if err != nil {
 		return nil, err
 	}
 
-	kek, err := dc.getKEK(, dbF, stringToKeyC, resCreate)
+	kek, err := dc.getKEK(uniqueID, individualRelation, keyRelation, dbF, stringToKeyC, resCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -197,11 +201,11 @@ func (dc *DEKCombKEK) GetDEK(uniqueID, individualRef string, dbF keyFetcher, str
 }
 
 // retrieve KEK from manager to de/encrypt DEK
-func (dc *DEKCombKEK) getKEK(uniqueID, individualRef string, dbF keyFetcher, stringToKey func(keyRaw any) ([]byte, error), resCreate responseCreator) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) getKEK(uniqueID, individualRelation, keyRelation string, dbF keyFetcher, stringToKey func(keyRaw any) ([]byte, error), resCreate responseCreator) (*memguard.Enclave, error) {
 	// check if KEK is cached
 	var kek *memguard.Enclave
 
-	keyRaw, err := dbF.GetKey(uniqueID, individualRef, stringToKey)
+	keyRaw, err := dbF.GetKey(uniqueID, individualRelation, keyRelation, stringToKey)
 	if err != nil {
 		return nil, err
 	}
