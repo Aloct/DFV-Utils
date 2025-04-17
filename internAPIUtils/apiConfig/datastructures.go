@@ -26,30 +26,30 @@ type KEKRegister struct {
 	KEK string `json:"kek"`
 	KEKDB string `json:"kekdb"`
 	Scope string `json:"scope"`
+	ID string `json:"id"`
 	UserBlind string `json:"userblind"`
 	KeyBlind string `json:"keyblind"`
 }
 
-func (*responseCreator) NewKEKRegister(kek, kekdb, scope, userBlind, keyBlind string) interface{} {
+func (*responseCreator) NewKEKRegister(kek, kekdb, scope, id, userBlind, keyBlind string) interface{} {
 	return KEKRegister{
 		KEK:  kek,
 		KEKDB: kekdb,
 		Scope: scope,
+		ID: id,
 		UserBlind: userBlind,
 		KeyBlind: keyBlind,
 	}
 }
 
 type KEKIdentifier struct {
-	KEK string `json:"kek"`
 	KEKDB string `json:"kekdb"`
 	ID string `json:"id"`
 	IDType string `json:"idtype"`
 }
 
-func (*responseCreator) NewKEKIdentifier(kek, kekdb, id, idType string) interface{} {
+func (*responseCreator) NewKEKIdentifier(kekdb, id, idType string) interface{} {
 	return KEKIdentifier{
-		KEK:  kek,
 		KEKDB: kekdb,
 		ID: id,
 		IDType: idType,
