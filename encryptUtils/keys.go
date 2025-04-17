@@ -17,18 +17,26 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-type kekRefs struct {
-	KEKID         string
+var serviceMasterSalt = "authTempSalt1234"
+
+type KEKRefs struct {
 	Manager       string
-	KEKDB         string
-	KEKCache      string
-	Cached        time.Time
-	CacheDuration time.Duration
+	DB         string
+	Algorithm string
+	CachingType string
+}
+
+type DEKRefs struct {
+	DB         string
+	Algorithm string
+	CachingType string
 }
 
 type DEKCombKEK struct {
-	Dek   []byte
-	KekDB kekRefs
+	Scope string
+	KeyMappingType string
+	DEKInfos *DEKRefs
+	KEKInfos *KEKRefs
 }
 
 type keyFetcher interface {
@@ -40,100 +48,142 @@ type keyFetcher interface {
 }
 
 type responseCreator interface {
-	NewPasetoIdentifier(kek, kekdb, id string) interface{}
+	NewPasetoIdentifier(kek, kekdb string) interface{}
 	NewStdResponse(context string, data interface{}) interface{}
+	NewKEKRegister(kek, kekdb, scope, userBlind, keyBlind string) interface{}
 }
 
-// dek is encrypted via the kek which is referenced by kekRef, passed dek must be unencrypted
-func CreateDEKCombKEK(dek *memguard.Enclave, kekDB string, kekCache string, cacheDuration time.Duration, managerC string, managerP int, resCreate responseCreator) (*DEKCombKEK, error) {
-	kek, err := CreateAESKey(32)
-	if err != nil {
-		return nil, err
+func CreateDEKRefs(db, algorithm, cachingType string) *DEKRefs {
+	return &DEKRefs{
+		DB:         db,
+		Algorithm: algorithm,
+		CachingType: cachingType,
 	}
+}
 
-	dekEncrypted, err := AesEncryption(dek, kek)
-	if err != nil {
-		return nil, err
+func CreateKEKRefs(manager, db, algorithm, cachingType string) *KEKRefs {
+	return &KEKRefs{
+		Manager: 	 manager, //container:port
+		DB:         db,
+		Algorithm: algorithm,
+		CachingType: cachingType,
 	}
+}
 
+func CreateDEKCombKEK(keyMappingType string, scope string, dekRefs *DEKRefs, kekRefs *KEKRefs, resCreate responseCreator) (*DEKCombKEK, error) {
+	return &DEKCombKEK{
+		Scope: scope,
+		KeyMappingType: keyMappingType,
+		DEKInfos: dekRefs,
+		KEKInfos: kekRefs,
+	}, nil
+}
+
+// register new KEK
+func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator) error {
+	var kek *memguard.Enclave
+	var err error
+	switch dc.KEKInfos.Algorithm {
+	case "AES":
+		kek, err = CreateAESKey(32)
+		if err != nil {
+			return err
+		}
+	}
+	
 	keyBuf, err := kek.Open()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer keyBuf.Destroy()
 
 	keyString, err := KeyToString(keyBuf.Bytes())
 	if err != nil {
+		return err
+	}
+
+	userBlind, err := CreateKeyBlind(serviceMasterSalt, dc.Scope, "KEK")
+	if err != nil {
+		return nil, err
+	}
+	keyBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, "0", "KEK")
+	if err != nil {
 		return nil, err
 	}
 
-	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewPasetoIdentifier(keyString, kekDB, "")))
+	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewKEKRegister(keyString, dc.KEKInfos.DB, dc.Scope, userBlind, keyBlind)))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s:%d/registerKEK", managerC, managerP), bytes.NewReader(jsonData))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bytes.NewReader(jsonData))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
-	fmt.Println("TRY")
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		time.Sleep(10 * time.Second)
-		fmt.Println("RETRY")
-		req, err = http.NewRequest("POST", fmt.Sprintf("https://%s:%d/registerKEK", managerC, managerP), bytes.NewReader(jsonData))
+		req, err = http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bytes.NewReader(jsonData))
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		req.Header.Add("Content-Type", "application/json")
 		res, err = client.Do(req)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	if res.StatusCode != http.StatusCreated {
-		return nil, errors.New("failed to add key comb to auth manager")
+		return errors.New("failed to add key comb to auth manager")
 	}
 
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
+	// body, err := io.ReadAll(res.Body)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer res.Body.Close()
 
-	resData := make(map[string]interface{})
-	err = json.Unmarshal(body, &resData)
-	if err != nil {
-		return nil, err
-	}
+	// resData := make(map[string]interface{})
+	// err = json.Unmarshal(body, &resData)
+	// if err != nil {
+	// 	return err
+	// }
 
-	return &DEKCombKEK{
-		Dek: dekEncrypted,
-		KekDB: kekRefs{
-			KEKID:         resData["data"].(string),
-			Manager:       fmt.Sprintf("%s:%d", managerC, managerP),
-			KEKDB:         kekDB,
-			KEKCache:      kekCache,
-			Cached:        time.Now().Add(-cacheDuration),
-			CacheDuration: cacheDuration,
-		},
-	}, nil
+	return nil
 }
 
-// https://developer.ibm.com/tutorials/docker-dev-db/
+// register new DEK under a KEK => DEK-KEK-reference stored
+func (dc *DEKCombKEK) RegisterNewDEK(individualRef string) error {
+	var dek *memguard.Enclave
+	var err error
+	switch dc.KEKInfos.Algorithm {
+	case "AES":
+		dek, err = CreateAESKey(32)
+		if err != nil {
+			return err
+		}
+	}
+	
+}
 
-func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher, keyToString interface{}, stringToKey interface{}) (*memguard.Enclave, error) {
+// retrieve decrypted DEK to handle Data
+func (dc *DEKCombKEK) GetDEK(uniqueID, individualRef string, dbF keyFetcher, stringToKey interface{}, resCreate responseCreator) (*memguard.Enclave, error) {
 	// get KEK from decryptKEK()
-	keyToStringC := keyToString.(func(keyRaw any) (string, error))
 	stringToKeyC := stringToKey.(func(keyRaw any) ([]byte, error))
 
-	kek, err := dc.decryptKEK(dbF, cacheF, keyToStringC, stringToKeyC)
+	// get DEK and retrieve information to get related KEK 
+	dekRaw, err := dbF.GetKey(uniqueID, individualRef, stringToKeyC)
+	if err != nil {
+		return nil, err
+	}
+
+	kek, err := dc.getKEK(, dbF, stringToKeyC, resCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -146,79 +196,69 @@ func (dc *DEKCombKEK) GetDEK(dbF keyFetcher, cacheF keyFetcher, keyToString inte
 	return dek, nil
 }
 
-func (dc *DEKCombKEK) decryptKEK(dbF keyFetcher, cacheF keyFetcher, keyToString func(keyRaw any) (string, error), stringToKey func(keyRaw any) ([]byte, error)) (*memguard.Enclave, error) {
+// retrieve KEK from manager to de/encrypt DEK
+func (dc *DEKCombKEK) getKEK(uniqueID, individualRef string, dbF keyFetcher, stringToKey func(keyRaw any) ([]byte, error), resCreate responseCreator) (*memguard.Enclave, error) {
 	// check if KEK is cached
 	var kek *memguard.Enclave
 
-	if time.Since(dc.KekDB.Cached) < dc.KekDB.CacheDuration {
-		kekRaw, err := cacheF.GetKey(dc.KekDB.KEKID, "", stringToKey)
+	keyRaw, err := dbF.GetKey(uniqueID, individualRef, stringToKey)
+	if err != nil {
+		return nil, err
+	}
+
+	keyString, err := KeyToString(keyRaw.([]byte))
+	if err != nil {
+		return nil, err
+	}
+
+	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewPasetoIdentifier(keyString, dc.KEKInfos.DB)))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/decryptKEK", dc.KEKInfos.Manager), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusFound {
+		return nil, errors.New("failed to decrypt KEK in auth manager")
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	kek, err = func() (*memguard.Enclave, error) {
+		var b64Encoded string
+		err = json.Unmarshal(body, &b64Encoded)
 		if err != nil {
 			return nil, err
 		}
 
-		kek = kekRaw.(*memguard.Enclave)
-	} else {
-		keyRaw, err := dbF.GetKey(dc.KekDB.KEKID, "", stringToKey)
+		splitted := strings.Split(b64Encoded, ";")
+		b64Raw := splitted[0]
+
+		b64Decoded, err := base64.StdEncoding.DecodeString(b64Raw)
 		if err != nil {
 			return nil, err
 		}
 
-		// process key and decrypt via manager
-		jsonData, err := json.Marshal(base64.StdEncoding.EncodeToString(keyRaw.([]byte)))
-		if err != nil {
-			return nil, err
-		}
+		return memguard.NewEnclave(b64Decoded), nil
+	}()
 
-		req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/decryptKEK", dc.KekDB.Manager), bytes.NewBuffer(jsonData))
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Add("Content-Type", "application/json")
-
-		client := &http.Client{}
-		res, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if res.StatusCode != http.StatusFound {
-			return nil, errors.New("failed to decrypt KEK in auth manager")
-		}
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, err
-		}
-		defer res.Body.Close()
-
-		kek, err = func() (*memguard.Enclave, error) {
-			var b64Encoded string
-			err = json.Unmarshal(body, &b64Encoded)
-			if err != nil {
-				return nil, err
-			}
-
-			splitted := strings.Split(b64Encoded, ";")
-			b64Raw := splitted[0]
-
-			enclave := memguard.NewEnclave([]byte(b64Raw))
-
-			// cache key to increase decryption speed
-			cacheF.SetKey(dc.KekDB.KEKID, "v1", "", enclave, &dc.KekDB.CacheDuration, keyToString)
-			dc.KekDB.Cached = time.Now()
-
-			b64Decoded, err := base64.StdEncoding.DecodeString(b64Raw)
-			if err != nil {
-				return nil, err
-			}
-
-			return memguard.NewEnclave(b64Decoded), nil
-		}()
-
-		if err != nil {
-			return nil, err
-		}
+	if err != nil {
+		return nil, err
 	}
 
 	return kek, nil

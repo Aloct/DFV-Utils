@@ -22,17 +22,37 @@ func (*responseCreator) NewStdResponse(context string, data interface{}) interfa
 	}
 }
 
+type KEKRegister struct {
+	KEK string `json:"kek"`
+	KEKDB string `json:"kekdb"`
+	Scope string `json:"scope"`
+	UserBlind string `json:"userblind"`
+	KeyBlind string `json:"keyblind"`
+}
+
+func (*responseCreator) NewKEKRegister(kek, kekdb, scope, userBlind, keyBlind string) interface{} {
+	return KEKRegister{
+		KEK:  kek,
+		KEKDB: kekdb,
+		Scope: scope,
+		UserBlind: userBlind,
+		KeyBlind: keyBlind,
+	}
+}
+
 type KEKIdentifier struct {
 	KEK string `json:"kek"`
 	KEKDB string `json:"kekdb"`
 	ID string `json:"id"`
+	IDType string `json:"idtype"`
 }
 
-func (*responseCreator) NewKEKIdentifier(kek, kekdb, id string) interface{} {
+func (*responseCreator) NewKEKIdentifier(kek, kekdb, id, idType string) interface{} {
 	return KEKIdentifier{
 		KEK:  kek,
 		KEKDB: kekdb,
 		ID: id,
+		IDType: idType,
 	}
 }
 

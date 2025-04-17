@@ -44,3 +44,12 @@ func StringToKey(keyRaw any) ([]byte, error) {
 
 	return decodedKey, err
 }
+
+func HashToString(hashRaw any) (string, error) {
+	serialized, err := KeyToString(hashRaw)
+	if err != nil {
+		return "", err
+	}
+
+	return serialized, nil
+}
