@@ -23,7 +23,7 @@ type DBWrapper interface {
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
 	GetKey(id string, individualref string, stringToKey interface{}) (any, error)
-	SetKey(id string, individualref string, version string, key any, d *time.Duration, keyToString interface{}) error
+	SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error
 }
 
 type DBPool struct {
@@ -184,7 +184,7 @@ func (r *RedisWrapper) GetKey(id string, individualref string, stringToKey inter
 	return returnedData, nil
 }
 
-func (r *RedisWrapper) SetKey(id string, individualref string, version string, key any, duration *time.Duration, keyToString interface{}) error {
+func (r *RedisWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error {
 	keyLocked, err := key.(*memguard.Enclave).Open()
 	if err != nil {
 		return err
@@ -197,13 +197,15 @@ func (r *RedisWrapper) SetKey(id string, individualref string, version string, k
 		}
 
 		var identifier string
-		if (individualref != "") {
-			identifier = individualref
+		if (individualrelation != "") {
+			identifier = individualrelation
+		} else if (keyrelation != "") {
+			identifier = keyrelation
 		} else {
 			identifier = id
 		}
 
-		return r.DB.Set(context.Background(), identifier, keyString, *duration), nil
+		return r.DB.Set(context.Background(), identifier, keyString, *d), nil
 	}()
 	keyLocked.Destroy()
 
@@ -312,13 +314,13 @@ func (sr *MySQLWrapper) GetKey(id, idType string, stringToKey interface{}) (any,
 }
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) SetKey(id string, version string, individualref string, key any, d *time.Duration, keyToString interface{}) error {
+func (sr *MySQLWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error {
 	keyString, err := (keyToString.(func(keyRaw any) (string, error)))(key)
 	if err != nil {
 		return err
 	}
 
-	_, err = sr.DB.Exec("INSERT INTO kstore (uniqueid, individualref, vers, k_val) VALUES (?, ?, ?, ?)", id, individualref, version, keyString)
+	_, err = sr.DB.Exec("INSERT INTO kstore (uniqueid, individualrelation, keyrelation, vers, k_val) VALUES (?, ?, ?, ?, ?)", id, individualrelation, keyrelation, version, keyString)
 	if err != nil {
 		return err
 	}
