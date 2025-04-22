@@ -22,8 +22,8 @@ type DBWrapper interface {
 	// rotatePW(ctx context.Context) error
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
-	GetKey(id string, individualref string, stringToKey interface{}) (any, error)
-	SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error
+	GetKey(id string, individualref string) (any, error)
+	SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration) error
 }
 
 type DBPool struct {
@@ -36,22 +36,6 @@ type BaseWrapper struct {
 	Port              int
 	Password          string
 }
-
-// func (b *BaseWrapper) RateLimit(ctx context.Context) error {
-// 	if b.RateLimitEnabled {
-
-// 	}
-
-// 	return nil
-// }
-
-// func (b *BaseWrapper) PwRotation(ctx context.Context) error {
-// 	if b.PwRotationEnabled {
-
-// 	}
-
-// 	return nil
-// }
 
 type RedisWrapper struct {
 	BaseWrapper
@@ -154,7 +138,7 @@ func (r *RedisWrapper) SetData(query string, values []any, duration *time.Durati
 	return nil
 }
 
-func (r *RedisWrapper) GetKey(id string, individualref string, stringToKey interface{}) (any, error) {
+func (r *RedisWrapper) GetKey(id string, individualref string) (any, error) {
 	var identifier string
 	if (individualref != "") {
 		identifier = individualref
@@ -165,17 +149,12 @@ func (r *RedisWrapper) GetKey(id string, individualref string, stringToKey inter
 	val := r.DB.Get(context.Background(), identifier)
 
 	returnedData, err := func() (*memguard.Enclave, error) {
-		valRaw, err := val.Result()
+		valRaw, err := val.Bytes()
 		if err != nil {
 			return nil, err
 		}
 
-		valKey, err := (stringToKey.(func(keyRaw any) ([]byte, error)))(valRaw)
-		if err != nil {
-			return nil, err
-		}
-
-		return memguard.NewEnclave(valKey), err
+		return memguard.NewEnclave(valRaw), err
 	}()
 	if err != nil {
 		return nil, err
@@ -184,18 +163,13 @@ func (r *RedisWrapper) GetKey(id string, individualref string, stringToKey inter
 	return returnedData, nil
 }
 
-func (r *RedisWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error {
+func (r *RedisWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration) error {
 	keyLocked, err := key.(*memguard.Enclave).Open()
 	if err != nil {
 		return err
 	}
 
 	ret, err := func() (*redis.StatusCmd, error) {
-		keyString, err := (keyToString.(func(keyRaw any) (string, error)))(keyLocked.Bytes())
-		if err != nil {
-			return nil, err
-		}
-
 		var identifier string
 		if (individualrelation != "") {
 			identifier = individualrelation
@@ -205,7 +179,7 @@ func (r *RedisWrapper) SetKey(id, individualrelation, keyrelation, version strin
 			identifier = id
 		}
 
-		return r.DB.Set(context.Background(), identifier, keyString, *d), nil
+		return r.DB.Set(context.Background(), identifier, keyLocked.Bytes(), *d), nil
 	}()
 	keyLocked.Destroy()
 
@@ -293,8 +267,8 @@ func (sr *MySQLWrapper) Close() error {
 
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) GetKey(id, idType string, stringToKey interface{}) (any, error) {
-	if (id != "keyRelation" && id != "individualRelation" && id != "uniqueID") {
+func (sr *MySQLWrapper) GetKey(id, idType string) (any, error) {
+	if (idType != "keyrelation" && idType != "individualrelation" && idType != "uniqueid") {
 		return nil, fmt.Errorf("invalid id type")
 	}
 
@@ -304,23 +278,18 @@ func (sr *MySQLWrapper) GetKey(id, idType string, stringToKey interface{}) (any,
 		return nil, err
 	}
 
-	keySlice, err := (stringToKey.(func(keyRaw any) ([]byte, error)))(returnedValue)
-	// keySlice, err := hex.DecodeString(string(returnedValue.([]byte)))
-	if err != nil {
-		return nil, err
+	keySlice, ok := returnedValue.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert key to []byte")
+
 	}
 
 	return keySlice, nil
 }
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error {
-	keyString, err := (keyToString.(func(keyRaw any) (string, error)))(key)
-	if err != nil {
-		return err
-	}
-
-	_, err = sr.DB.Exec("INSERT INTO kstore (uniqueid, individualrelation, keyrelation, vers, k_val) VALUES (?, ?, ?, ?, ?)", id, individualrelation, keyrelation, version, keyString)
+func (sr *MySQLWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration) error {
+	_, err := sr.DB.Exec("INSERT INTO kstore (uniqueid, individualrelation, keyrelation, vers, k_val) VALUES (?, ?, ?, ?, ?)", id, individualrelation, keyrelation, version, key.([]byte))
 	if err != nil {
 		return err
 	}

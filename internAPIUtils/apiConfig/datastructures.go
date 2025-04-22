@@ -1,18 +1,19 @@
 package apiConfig
+
 // internal payload types
 // 7001 - simpleType
 // 7010 - keyIdentComb
-
-type stdResponse struct {
-	Context string      `json:"context"`
-	Data    interface{} `json:"data,omitempty"`
-}
 
 // complex structs for Data field
 type responseCreator struct{}
 
 func NewResponseCreator() *responseCreator {
 	return &responseCreator{}
+}
+
+type stdResponse struct {
+	Context string      `json:"context"`
+	Data    interface{} `json:"data,omitempty"`
 }
 
 func (*responseCreator) NewStdResponse(context string, data interface{}) interface{} {
@@ -22,23 +23,41 @@ func (*responseCreator) NewStdResponse(context string, data interface{}) interfa
 	}
 }
 
+type groupResponse struct {
+	Context string      `json:"context"`
+	SubResponses []interface{} `json:"subresponses"`
+}
+
+func (*responseCreator) NewGroupResponse(context string, subResponses... interface{}) interface{} {
+	return groupResponse{
+		Context: context,
+		SubResponses: subResponses,
+	}
+}
+
+
+
+type DEKRegister struct {
+
+}
+
+func (*responseCreator) NewDEKRegister() {
+	
+}
+
 type KEKRegister struct {
-	KEK string `json:"kek"`
 	KEKDB string `json:"kekdb"`
 	Scope string `json:"scope"`
 	ID string `json:"id"`
 	UserBlind string `json:"userblind"`
-	KeyBlind string `json:"keyblind"`
 }
 
-func (*responseCreator) NewKEKRegister(kek, kekdb, scope, id, userBlind, keyBlind string) interface{} {
+func (*responseCreator) NewKEKRegister(kekdb, scope, id, userBlind string) interface{} {
 	return KEKRegister{
-		KEK:  kek,
 		KEKDB: kekdb,
 		Scope: scope,
 		ID: id,
 		UserBlind: userBlind,
-		KeyBlind: keyBlind,
 	}
 }
 

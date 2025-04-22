@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -23,64 +24,71 @@ type KEKRefs struct {
 	Manager       string
 	DB         string
 	Algorithm string
+	Scope string
 	CachingType string
 }
 
 type DEKRefs struct {
 	DB         string
 	Algorithm string
+	Scope string
+	InnerScope string
 	CachingType string
 }
 
 type DEKCombKEK struct {
-	Scope string
 	KeyMappingType string
+	Scope string
 	DEKInfos *DEKRefs
 	KEKInfos *KEKRefs
 }
 
 type keyFetcher interface {
-	GetKey(id, individualRelation, keyRelation string, stringToKey interface{}) (any, error)
-	SetKey(id string, version string, individualref string, key any, d *time.Duration, keyToString interface{}) error
+	GetKey(id, idType string, stringToKey interface{}) (any, error)
+	SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error
 
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, n *time.Duration) error
 }
 
 type responseCreator interface {
-	NewPasetoIdentifier(kek, kekdb string) interface{}
 	NewStdResponse(context string, data interface{}) interface{}
-	NewKEKRegister(kek, kekdb, scope, userBlind, keyBlind string) interface{}
+	NewKEKRegister(kekdb, scope, id, userBlind string) interface{}
+	NewKEKIdentifier(kekdb, id, idType string) interface{}
+	SetKeyMetaForMultipartReq(w *multipart.Writer, key *memguard.Enclave, metadata interface{}) (*multipart.Writer, error)
 }
 
-func CreateDEKRefs(db, algorithm, cachingType string) *DEKRefs {
+func CreateDEKRefs(db, algorithm, scope, innerScope, cachingType string) *DEKRefs {
 	return &DEKRefs{
 		DB:         db,
 		Algorithm: algorithm,
+		Scope: scope,
+		InnerScope: innerScope,
 		CachingType: cachingType,
 	}
 }
 
-func CreateKEKRefs(manager, db, algorithm, cachingType string) *KEKRefs {
+func CreateKEKRefs(manager, db, algorithm, scope, cachingType string) *KEKRefs {
 	return &KEKRefs{
 		Manager: 	 manager, //container:port
 		DB:         db,
 		Algorithm: algorithm,
+		Scope: scope,
 		CachingType: cachingType,
 	}
 }
 
-func CreateDEKCombKEK(keyMappingType string, scope string, dekRefs *DEKRefs, kekRefs *KEKRefs, resCreate responseCreator) (*DEKCombKEK, error) {
+func CreateDEKCombKEK(keyMappingType, scope string, dekRefs *DEKRefs, kekRefs *KEKRefs, resCreate responseCreator) (*DEKCombKEK, error) {
 	return &DEKCombKEK{
-		Scope: scope,
 		KeyMappingType: keyMappingType,
+		Scope: scope,
 		DEKInfos: dekRefs,
 		KEKInfos: kekRefs,
 	}, nil
 }
 
 // register new KEK
-func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator) error {
+func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... DEKRefs) error {
 	var kek *memguard.Enclave
 	var err error
 	switch dc.KEKInfos.Algorithm {
@@ -90,33 +98,46 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator) error {
 			return err
 		}
 	}
+
+	userBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, "0", "KEK")
+	if err != nil {
+		return err
+	}
+
+	// keyString, err := KeyToString(keyBuf.Bytes())
+	// if err != nil {
+	// 	return err
+	// }
+
+	bodyMultiData := &bytes.Buffer{}
+	w := multipart.NewWriter(bodyMultiData)
+
+	subRequestPart, err := w.CreateFormField("subRequests")
+
+	subRequests := make([]interface{}, len(defaultDEKs))
+	for i := range defaultDEKs {
+		subRequests = append(subRequests, resCreate.NewStdResponse("createDEKRefs", defaultDEKs[i]))
+	}
+
+	subRequestsJSON, err := json.Marshal(subRequests)
+	if err != nil {
+		return err
+	}
+
+	subRequestPart.Write(subRequestsJSON)
+
+	kekRegister := resCreate.NewKEKRegister(dc.KEKInfos.DB, dc.Scope, "", userBlind)
+	w, err = resCreate.SetKeyMetaForMultipartReq(w, kek, kekRegister)
+	if err != nil {
+		return err
+	}
+
+	err = w.Close()
+	if err != nil {
+		return err
+	}
 	
-	keyBuf, err := kek.Open()
-	if err != nil {
-		return err
-	}
-	defer keyBuf.Destroy()
-
-	keyString, err := KeyToString(keyBuf.Bytes())
-	if err != nil {
-		return err
-	}
-
-	userBlind, err := CreateKeyBlind(serviceMasterSalt, dc.Scope, "KEK")
-	if err != nil {
-		return err
-	}
-	keyBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, "0", "KEK")
-	if err != nil {
-		return err
-	}
-
-	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewKEKRegister(keyString, dc.KEKInfos.DB, dc.Scope, userBlind, keyBlind)))
-	if err != nil {
-		return err
-	}
-	
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bytes.NewReader(jsonData))
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bodyMultiData)
 	if err != nil {
 		return err
 	}
@@ -127,7 +148,7 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator) error {
 	res, err := client.Do(req)
 	if err != nil {
 		time.Sleep(10 * time.Second)
-		req, err = http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bytes.NewReader(jsonData))
+		req, err = http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bodyMultiData)
 		if err != nil {
 			return err
 		}
@@ -174,7 +195,11 @@ func (dc *DEKCombKEK) RegisterNewDEK(individualRef string) error {
 }
 
 // retrieve decrypted DEK to handle Data
-func (dc *DEKCombKEK) GetDEK(uniqueID, individualRelation, keyRelation string, dbF keyFetcher, stringToKey interface{}, resCreate responseCreator) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) GetDEK(id, idType string, dbF keyFetcher, stringToKey interface{}, resCreate responseCreator) (*memguard.Enclave, error) {
+	if (idType != "keyrelation" && idType != "individualrelation" && idType != "uniqueid") {
+		return nil, fmt.Errorf("invalid id type")
+	}
+	
 	// get KEK from decryptKEK()
 	stringToKeyC, ok := stringToKey.(func(keyRaw any) ([]byte, error))
 	if !ok {
@@ -182,17 +207,17 @@ func (dc *DEKCombKEK) GetDEK(uniqueID, individualRelation, keyRelation string, d
 	}
 
 	// get DEK and retrieve information to get related KEK 
-	dekRaw, err := dbF.GetKey(uniqueID, individualRelation, keyRelation, stringToKeyC)
+	dekRaw, err := dbF.GetKey(id, idType, stringToKeyC)
 	if err != nil {
 		return nil, err
 	}
 
-	kek, err := dc.getKEK(uniqueID, individualRelation, keyRelation, dbF, stringToKeyC, resCreate)
+	kek, err := dc.getKEK(id, idType, dbF, stringToKeyC, resCreate)
 	if err != nil {
 		return nil, err
 	}
 
-	dek, err := AesDecryption(dc.Dek, kek)
+	dek, err := AesDecryption(dekRaw.([]byte), kek)
 	if err != nil {
 		return nil, err
 	}
@@ -201,21 +226,21 @@ func (dc *DEKCombKEK) GetDEK(uniqueID, individualRelation, keyRelation string, d
 }
 
 // retrieve KEK from manager to de/encrypt DEK
-func (dc *DEKCombKEK) getKEK(uniqueID, individualRelation, keyRelation string, dbF keyFetcher, stringToKey func(keyRaw any) ([]byte, error), resCreate responseCreator) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) getKEK(id, idType string, dbF keyFetcher, stringToKey func(keyRaw any) ([]byte, error), resCreate responseCreator) (*memguard.Enclave, error) {
 	// check if KEK is cached
 	var kek *memguard.Enclave
 
-	keyRaw, err := dbF.GetKey(uniqueID, individualRelation, keyRelation, stringToKey)
+	keyRaw, err := dbF.GetKey(id, idType, stringToKey)
 	if err != nil {
 		return nil, err
 	}
 
-	keyString, err := KeyToString(keyRaw.([]byte))
-	if err != nil {
-		return nil, err
-	}
+	// keyString, err := KeyToString(keyRaw.([]byte))
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	jsonData, err := json.Marshal(resCreate.NewStdResponse("registerKEK", resCreate.NewPasetoIdentifier(keyString, dc.KEKInfos.DB)))
+	jsonData, err := json.Marshal(resCreate.NewStdResponse("getKEK", resCreate.NewKEKIdentifier(keyString, dc.KEKInfos.DB)))
 	if err != nil {
 		return nil, err
 	}

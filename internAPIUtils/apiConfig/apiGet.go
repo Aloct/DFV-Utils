@@ -3,6 +3,7 @@ package apiConfig
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -73,4 +74,25 @@ func GetErrorResponse(r http.Response) (*errorHandler.HTTPErrorContext, error) {
 	}
 
 	return &data, err
+}
+
+// mulipart requests
+func GetKeyMetaFromMultipartReq(r *http.Request, maxMemory int64) (interface{}, *memguard.Enclave, error) {
+	if err := r.ParseMultipartForm(maxMemory); err != nil {
+		return nil, nil, err
+	}
+
+	keyMeta := r.MultipartForm.Value["keymeta"]
+	if len(keyMeta) == 0 {
+		return nil, nil, errors.New("no key meta data found in request")
+	}
+
+	key := r.MultipartForm.File["key"]
+	if len(key) == 0 {
+		return nil, nil, errors.New("no key found in request")
+	} 
+
+	
+
+	return keyMeta, nil
 }

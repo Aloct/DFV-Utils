@@ -2,17 +2,19 @@ package encryptUtils
 
 import "golang.org/x/crypto/sha3"
 
-// have user want KEK
-// userBlindKEK = Hash(masterSaltFirst + scope + userRef + "KEK") => Hash(userBlind + masterSaltSecond) => KEK
-
 // have user want DEK
 // userBlindDEK = Hash(masterSaltSecond + scope + userRef + "DEK") => Hash(userblind + masterSaltFirst) => DEK
 
 // have KEK want DEK
-// kekBlind = Hash(masterSaltSecond + scope + "DEK") => Hash(kekBlind + masterSaltFirst) => DEK
+// kekBlind = Hash(masterSaltSecond + scope + kekUniqueID + "DEK") => Hash(kekBlind + masterSaltFirst) => DEK
+
+
+
+// have user want KEK
+// userBlindKEK = Hash(masterSaltFirst + scope + userRef + "KEK") => Hash(userBlind + masterSaltSecond) => KEK
 
 // have DEK want KEK
-// dekBlind = Hash(masterSaltFirst + scope + "KEK") => Hash(dekBlind + masterSaltSecond) => KEK
+// dekBlind = Hash(masterSaltFirst + scope + dekUniqueID + "KEK") => Hash(dekBlind + masterSaltSecond) => KEK
 
 // System uses userReference "0"
 
@@ -24,8 +26,8 @@ func uniHash(data... string) []byte {
 	return hash.Sum([]byte{})
 }
 
-func CreateUserBlind(serviceMasterSalt, scope, userRef, keyType string) (string, error) {
-	hash := uniHash(serviceMasterSalt, scope, userRef, keyType)
+func CreateUserBlind(serviceMasterSalt, scope, userRef, wantedKeyType string) (string, error) {
+	hash := uniHash(serviceMasterSalt, scope, userRef, wantedKeyType)
 
 	serialized, err := HashToString(hash)
 	if err != nil {
@@ -35,8 +37,8 @@ func CreateUserBlind(serviceMasterSalt, scope, userRef, keyType string) (string,
 	return serialized, nil
 } 
 
-func CreateKeyBlind(serviceMasterSalt, scope, keyType string) (string, error) {
-	hash := uniHash(serviceMasterSalt, scope, keyType)
+func CreateKeyBlind(serviceMasterSalt, scope, haveKeyUniqueID, wantedKeyType string) (string, error) {
+	hash := uniHash(serviceMasterSalt, scope, haveKeyUniqueID, wantedKeyType)
 
 	serialized, err := HashToString(hash)
 	if err != nil {
