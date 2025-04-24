@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	coreutils "github.com/Aloct/DFV-Utils/coreUtils"
 	"github.com/awnumar/memguard"
 )
 
@@ -40,7 +41,7 @@ func AesDecryption(ciphertext []byte, key *memguard.Enclave) (*memguard.Enclave,
 
 	plaintextEnclave := memguard.NewEnclave(plaintext)
 	
-	ToZero(plaintext)
+	coreutils.ToZero(plaintext)
 
 	return plaintextEnclave, nil
 }

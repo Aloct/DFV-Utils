@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	coreutils "github.com/Aloct/DFV-Utils/coreUtils"
 	"github.com/awnumar/memguard"
 )
 
@@ -304,7 +305,7 @@ func CreateAESKey(keySize int) (*memguard.Enclave, error) {
 	}
 
 	key := memguard.NewEnclave(keyRaw)
-	ToZero(keyRaw)
+	coreutils.ToZero(keyRaw)
 
 	return key, nil
 }

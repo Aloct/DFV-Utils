@@ -102,7 +102,10 @@ func (*responseCreator) SetKeyMetaForMultipartReq(w *multipart.Writer, key *memg
 	if err != nil {
 		return nil, err
 	}
-	keyMetas.Write(serialized)
+	_, err = keyMetas.Write(serialized)
+	if err != nil {
+		return nil, err
+	}
 
 	return w, nil
 }

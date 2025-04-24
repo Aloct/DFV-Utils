@@ -3,13 +3,16 @@ package apiConfig
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
+	coreutils "github.com/Aloct/DFV-Utils/coreUtils"
 	errorHandler "github.com/Aloct/DFV-Utils/internAPIUtils/errorHandling"
 	"github.com/awnumar/memguard"
 )
+
+type PartHandler func(io.Reader) (interface{}, error)
 
 func GetEnclaveFromJSON(r *http.Request) (*memguard.Enclave, error) {
 	body, err := io.ReadAll(r.Body)
@@ -77,22 +80,105 @@ func GetErrorResponse(r http.Response) (*errorHandler.HTTPErrorContext, error) {
 }
 
 // mulipart requests
-func GetKeyMetaFromMultipartReq(r *http.Request, maxMemory int64) (interface{}, *memguard.Enclave, error) {
-	if err := r.ParseMultipartForm(maxMemory); err != nil {
-		return nil, nil, err
+func ProcessMultipartRequest(r *http.Request, maxMemoryInMB int64, handlers map[string]PartHandler) (map[string]interface{}, error) {
+    if err := r.ParseMultipartForm(maxMemoryInMB << 20); err != nil {
+        return nil, err
+    }
+
+    reader, err := r.MultipartReader()
+    if err != nil {
+        return nil, err
+    }
+
+    results := make(map[string]interface{})
+
+    for {
+        part, err := reader.NextPart()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return nil, err
+        }
+
+        formName := part.FormName()
+        handler, exists := handlers[formName]
+        
+        if exists {
+            result, err := handler(part)
+            if err != nil {
+                return nil, err
+            }
+            results[formName] = result
+        }
+    }
+
+    // Check if all required handlers were applied
+    for name := range handlers {
+        if _, exists := results[name]; !exists {
+            return nil, fmt.Errorf("missing required part: %s", name)
+        }
+    }
+
+    return results, nil
+}
+
+func NewHandlerMap(expectedData... string) map[string]PartHandler {
+	handlers := make(map[string]PartHandler)
+	for _, data := range expectedData {
+		switch data {
+		case "metadata":
+			handlers[data] = MetadataHandler
+		case "key":
+			handlers[data] = KeyHandler
+		case "subRequest":
+			handlers[data] = SubRequestHandler
+		default:
+			panic(fmt.Sprintf("unknown part type: %s", data))
+		}
+	}
+	return handlers
+}
+
+func MetadataHandler(part io.Reader) (interface{}, error) {
+    metadataBytes, err := io.ReadAll(part)
+    if err != nil {
+        return nil, err
+    }
+
+    var metadata interface{}
+    err = json.Unmarshal(metadataBytes, &metadata)
+    if err != nil {
+        return nil, err
+    }
+	coreutils.ToZero(metadataBytes)
+    
+    return metadata, nil
+}
+
+func KeyHandler(part io.Reader) (interface{}, error) {
+    keyData, err := io.ReadAll(part)
+    if err != nil {
+        return nil, err
+    }
+    
+    enclave := memguard.NewEnclave(keyData)
+    coreutils.ToZero(keyData)
+    
+    return enclave, nil
+}
+
+func SubRequestHandler(part io.Reader) (interface{}, error) {
+	subRequestBytes, err := io.ReadAll(part)
+	if err != nil {
+		return nil, err
 	}
 
-	keyMeta := r.MultipartForm.Value["keymeta"]
-	if len(keyMeta) == 0 {
-		return nil, nil, errors.New("no key meta data found in request")
+	var subRequest interface{}
+	err = json.Unmarshal(subRequestBytes, &subRequest)
+	if err != nil {
+		return nil, err
 	}
-
-	key := r.MultipartForm.File["key"]
-	if len(key) == 0 {
-		return nil, nil, errors.New("no key found in request")
-	} 
-
 	
-
-	return keyMeta, nil
+	return subRequest, nil
 }

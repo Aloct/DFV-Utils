@@ -1,3 +1,5 @@
+github.com/Aloct/DFV-Utils v0.0.0-20250418115401-c87ad5414685 h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
+github.com/Aloct/DFV-Utils v0.0.0-20250418115401-c87ad5414685/go.mod h1:kCJG3Ap+1hjhefNNgoRl8FYnGzQCu3zaauMp/PW+a08=
 github.com/awnumar/memcall v0.2.0 h1:sRaogqExTOOkkNwO9pzJsL8jrOV29UuUW7teRMfbqtI=
 github.com/awnumar/memcall v0.2.0/go.mod h1:S911igBPR9CThzd/hYQQmTc9SWNu3ZHIlCGaWsWsoJo=
 github.com/awnumar/memguard v0.22.5 h1:PH7sbUVERS5DdXh3+mLo8FDcl1eIeVjJVYMnyuYpvuI=
