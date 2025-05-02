@@ -15,7 +15,7 @@ import (
 func WriteSuccessResponse(w http.ResponseWriter, status int, context string) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(stdResponse{
+	json.NewEncoder(w).Encode(StdResponse{
 		Context: context,
 	})
 
@@ -26,7 +26,7 @@ func WriteJSONResponse(w http.ResponseWriter, status int, context string, data i
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if data != "" {
-		json.NewEncoder(w).Encode(stdResponse{
+		json.NewEncoder(w).Encode(StdResponse{
 			Context: context,
 			Data:    data,
 		})
@@ -77,7 +77,7 @@ func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave) error {
 }
 
 // mulipart requests
-func (*responseCreator) SetKeyMetaForMultipartReq(w *multipart.Writer, key *memguard.Enclave, metadata interface{}) (*multipart.Writer, error) {
+func SetKeyMetaForMultipartReq(w *multipart.Writer, key *memguard.Enclave, metadata interface{}) (*multipart.Writer, error) {
 	keyPart, err := w.CreateFormFile("key", "keyfile")
 	if err != nil {
 		return nil, err
@@ -103,6 +103,24 @@ func (*responseCreator) SetKeyMetaForMultipartReq(w *multipart.Writer, key *memg
 		return nil, err
 	}
 	_, err = keyMetas.Write(serialized)
+	if err != nil {
+		return nil, err
+	}
+
+	return w, nil
+}
+
+func SetSubRequestsForMultipartReq(w *multipart.Writer, subRequests... []StdRequest) (*multipart.Writer, error) {
+	subPart, err := w.CreateFormField("subRequests")
+	if err != nil {
+		return nil, err
+	}
+
+	serialized, err := json.Marshal(subRequests)
+	if err != nil {
+		return nil, err
+	}
+	_, err = subPart.Write(serialized)
 	if err != nil {
 		return nil, err
 	}

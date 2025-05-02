@@ -2,9 +2,9 @@ package encryptUtils
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,36 +12,38 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"strings"
 	"time"
 
 	coreutils "github.com/Aloct/DFV-Utils/coreUtils"
+	wrapperUtils "github.com/Aloct/DFV-Utils/dataHandling/storageWrapper"
+	internAPIUtils "github.com/Aloct/DFV-Utils/internAPIUtils/apiConfig"
 	"github.com/awnumar/memguard"
 )
 
-var serviceMasterSalt = "authTempSalt1234"
+var serviceMasterSalt = []byte("serviceMasterSalt1234")
+var client = &http.Client{}
 
 type KEKRefs struct {
-	Manager       string
-	DB         string
-	Algorithm string
-	Scope string
+	Manager     string
+	DB          string
+	Algorithm   string
+	Scope       string
 	CachingType string
 }
 
 type DEKRefs struct {
-	DB         string
-	Algorithm string
-	Scope string
-	InnerScope string
+	DB          string
+	Algorithm   string
+	Scope       string
+	InnerScope  string
 	CachingType string
 }
 
 type DEKCombKEK struct {
 	KeyMappingType string
-	Scope string
-	DEKInfos *DEKRefs
-	KEKInfos *KEKRefs
+	Scope          string
+	DEKInfos       *DEKRefs
+	KEKInfos       *KEKRefs
 }
 
 type keyFetcher interface {
@@ -52,44 +54,39 @@ type keyFetcher interface {
 	SetData(query string, values []any, n *time.Duration) error
 }
 
-type responseCreator interface {
-	NewStdResponse(context string, data interface{}) interface{}
-	NewKEKRegister(kekdb, scope, id, userBlind string) interface{}
-	NewKEKIdentifier(kekdb, id, idType string) interface{}
-	SetKeyMetaForMultipartReq(w *multipart.Writer, key *memguard.Enclave, metadata interface{}) (*multipart.Writer, error)
-}
+type PartHandler func(io.Reader) (interface{}, error)
 
 func CreateDEKRefs(db, algorithm, scope, innerScope, cachingType string) *DEKRefs {
 	return &DEKRefs{
-		DB:         db,
-		Algorithm: algorithm,
-		Scope: scope,
-		InnerScope: innerScope,
+		DB:          db,
+		Algorithm:   algorithm,
+		Scope:       scope,
+		InnerScope:  innerScope,
 		CachingType: cachingType,
 	}
 }
 
 func CreateKEKRefs(manager, db, algorithm, scope, cachingType string) *KEKRefs {
 	return &KEKRefs{
-		Manager: 	 manager, //container:port
-		DB:         db,
-		Algorithm: algorithm,
-		Scope: scope,
+		Manager:     manager, //container:port
+		DB:          db,
+		Algorithm:   algorithm,
+		Scope:       scope,
 		CachingType: cachingType,
 	}
 }
 
-func CreateDEKCombKEK(keyMappingType, scope string, dekRefs *DEKRefs, kekRefs *KEKRefs, resCreate responseCreator) (*DEKCombKEK, error) {
+func CreateDEKCombKEK(keyMappingType, scope string, dekRefs *DEKRefs, kekRefs *KEKRefs) (*DEKCombKEK, error) {
 	return &DEKCombKEK{
 		KeyMappingType: keyMappingType,
-		Scope: scope,
-		DEKInfos: dekRefs,
-		KEKInfos: kekRefs,
+		Scope:          scope,
+		DEKInfos:       dekRefs,
+		KEKInfos:       kekRefs,
 	}, nil
 }
 
 // register new KEK
-func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... DEKRefs) error {
+func (dc *DEKCombKEK) RegisterNewKEK(pool wrapperUtils.DBPool, publicDB wrapperUtils.MySQLWrapper, defaultDEKs ...internAPIUtils.DEKRegister) error {
 	var kek *memguard.Enclave
 	var err error
 	switch dc.KEKInfos.Algorithm {
@@ -105,30 +102,17 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... D
 		return err
 	}
 
-	// keyString, err := KeyToString(keyBuf.Bytes())
-	// if err != nil {
-	// 	return err
-	// }
-
 	bodyMultiData := &bytes.Buffer{}
 	w := multipart.NewWriter(bodyMultiData)
 
-	subRequestPart, err := w.CreateFormField("subRequests")
-
-	subRequests := make([]interface{}, len(defaultDEKs))
+	subRequests := make([]internAPIUtils.StdRequest, len(defaultDEKs))
 	for i := range defaultDEKs {
-		subRequests = append(subRequests, resCreate.NewStdResponse("createDEKRefs", defaultDEKs[i]))
+		subRequests = append(subRequests, internAPIUtils.NewStdRequest("createDEKRefs", defaultDEKs[i]))
 	}
+	w, err = internAPIUtils.SetSubRequestsForMultipartReq(w, subRequests)
 
-	subRequestsJSON, err := json.Marshal(subRequests)
-	if err != nil {
-		return err
-	}
-
-	subRequestPart.Write(subRequestsJSON)
-
-	kekRegister := resCreate.NewKEKRegister(dc.KEKInfos.DB, dc.Scope, "", userBlind)
-	w, err = resCreate.SetKeyMetaForMultipartReq(w, kek, kekRegister)
+	kekRegister := internAPIUtils.NewKEKRegister(dc.KEKInfos.DB, dc.Scope, "", userBlind)
+	w, err = internAPIUtils.SetKeyMetaForMultipartReq(w, kek, kekRegister)
 	if err != nil {
 		return err
 	}
@@ -137,7 +121,7 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... D
 	if err != nil {
 		return err
 	}
-	
+
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bodyMultiData)
 	if err != nil {
 		return err
@@ -145,7 +129,6 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... D
 
 	req.Header.Add("Content-Type", "application/json")
 
-	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		time.Sleep(10 * time.Second)
@@ -161,8 +144,43 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... D
 		}
 	}
 
-	if res.StatusCode != http.StatusCreated {
-		return errors.New("failed to add key comb to auth manager")
+	if defaultDEKs != nil {
+		handlers := internAPIUtils.NewHandlerMap("subRequests")
+		resData, err := internAPIUtils.ProcessMultipartResponse(res, handlers)
+		if err != nil {
+			return err
+		}
+
+		subResponses, ok := resData["subRequests"].(internAPIUtils.GroupResponse)
+		if !ok {
+			return errors.New("invalid response format")
+		}
+
+		dekDB, err := pool.NewSQLWrapper(dc.DEKInfos.DB)
+		if err != nil {
+			return err
+		}
+		if dekDB.DB == nil {
+			err := dekDB.Connect(context.Background(), 2)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, stdRespRaw := range subResponses.Subs {
+			var stdResp internAPIUtils.StdResponse
+			err := json.Unmarshal(stdRespRaw.([]byte), &stdResp)
+			if err != nil {
+				return err
+			}
+
+			dekObj, ok := stdResp.Data.(internAPIUtils.DEKIdentifier)
+			if !ok {
+				return errors.New("invalid DEK object format")
+			}
+
+			dc.setNewDEKFromSet(dekObj, dekDB, kek, publicDB)
+		}
 	}
 
 	// body, err := io.ReadAll(res.Body)
@@ -180,118 +198,140 @@ func (dc *DEKCombKEK) RegisterNewKEK(resCreate responseCreator, defaultDEKs... D
 	return nil
 }
 
-// register new DEK under a KEK => DEK-KEK-reference stored
-func (dc *DEKCombKEK) RegisterNewDEK(individualRef string) error {
+func (dc *DEKCombKEK) setNewDEKFromSet(keySet internAPIUtils.DEKIdentifier, dekDB *wrapperUtils.MySQLWrapper, kek *memguard.Enclave, publicDB wrapperUtils.MySQLWrapper) error {
+	dekKEKBlind := keySet.KEKBlind
+
+	relationBlind, err := HashBlind(serviceMasterSalt, dekKEKBlind)
+	if err != nil {
+		return err
+	}
+
 	var dek *memguard.Enclave
-	var err error
-	switch dc.KEKInfos.Algorithm {
+	switch dc.DEKInfos.Algorithm {
 	case "AES":
 		dek, err = CreateAESKey(32)
 		if err != nil {
 			return err
 		}
+	case "ECC":
+		dek, err = CreateECCKey(publicDB)
+		if err != nil {
+			return err
+		}
 	}
-	
+
+	encodedDEK, err := AesEncryption(dek, kek)
+	if err != nil {
+		return err
+	}
+
+	// store DEK in right DB
+	dekDB.SetKey(keySet.ID, relationBlind, "v1", encodedDEK, nil)
+
+	return nil
+}
+
+// register new DEK under a KEK => DEK-KEK-reference stored
+func (dc *DEKCombKEK) RegisterNewDEK(dekReg internAPIUtils.DEKRegister, dp wrapperUtils.DBPool, publicDB wrapperUtils.MySQLWrapper) error {
+	body := internAPIUtils.NewStdRequest("createDEKRefs", dekReg)
+	serialized, err := json.Marshal(body)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bytes.NewBuffer(serialized))
+	if err != nil {
+		return err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	handlers := internAPIUtils.NewHandlerMap("key", "keyMetadata")
+	parts, err := internAPIUtils.ProcessMultipartResponse(res, handlers)
+	if err != nil {
+		return err
+	}
+
+	kek, ok := parts["key"].(*memguard.Enclave)
+	if !ok {
+		return errors.New("unexpcted type of KEK while registering DEK")
+	}
+
+	dekMeta, ok := parts["keyMetadata"].(internAPIUtils.DEKIdentifier)
+	if !ok {
+		return errors.New("unexpected type of metadata while registering DEK")
+	}
+
+	dbWrapper, err := dp.NewSQLWrapper(dc.DEKInfos.DB)
+	if err != nil {
+		return err
+	}
+	if dbWrapper.DB == nil {
+		dbWrapper.Connect(context.Background(), 2)
+	}
+
+	dc.setNewDEKFromSet(dekMeta, dbWrapper, kek, publicDB)
+
 	return nil
 }
 
 // retrieve decrypted DEK to handle Data
-func (dc *DEKCombKEK) GetDEK(id, idType string, dbF keyFetcher, stringToKey interface{}, resCreate responseCreator) (*memguard.Enclave, error) {
-	if (idType != "keyrelation" && idType != "individualrelation" && idType != "uniqueid") {
-		return nil, fmt.Errorf("invalid id type")
+func (dc *DEKCombKEK) GetDEK(dekRefs internAPIUtils.DEKRegister, userRef string, dp wrapperUtils.DBPool) (*memguard.Enclave, error) {
+	userBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, userRef, "KEK")
+	if err != nil {
+		return nil, err
 	}
-	
-	// get KEK from decryptKEK()
-	stringToKeyC, ok := stringToKey.(func(keyRaw any) ([]byte, error))
-	if !ok {
-		return nil, errors.New("invalid stringToKey function provided")
-	}
+	kekIdentifier := internAPIUtils.NewKEKIdentifier(userRef, userBlind)
 
-	// get DEK and retrieve information to get related KEK 
-	dekRaw, err := dbF.GetKey(id, idType, stringToKeyC)
+	dekKEKSet := internAPIUtils.NewDEKKEKSet(dekRefs, kekIdentifier)
+	serialized, err := json.Marshal(internAPIUtils.NewStdRequest("decryptDEK", dekKEKSet))
 	if err != nil {
 		return nil, err
 	}
 
-	kek, err := dc.getKEK(id, idType, dbF, stringToKeyC, resCreate)
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/getDEK", dc.KEKInfos.Manager), bytes.NewBuffer(serialized))
 	if err != nil {
 		return nil, err
 	}
-
-	dek, err := AesDecryption(dekRaw.([]byte), kek)
-	if err != nil {
-		return nil, err
-	}
-
-	return dek, nil
-}
-
-// retrieve KEK from manager to de/encrypt DEK
-func (dc *DEKCombKEK) getKEK(id, idType string, dbF keyFetcher, stringToKey func(keyRaw any) ([]byte, error), resCreate responseCreator) (*memguard.Enclave, error) {
-	// check if KEK is cached
-	var kek *memguard.Enclave
-
-	keyRaw, err := dbF.GetKey(id, idType, stringToKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// keyString, err := KeyToString(keyRaw.([]byte))
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	jsonData, err := json.Marshal(resCreate.NewStdResponse("getKEK", resCreate.NewKEKIdentifier(keyString, dc.KEKInfos.DB)))
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/decryptKEK", dc.KEKInfos.Manager), bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-
-	client := &http.Client{}
 	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if res.StatusCode != http.StatusFound {
-		return nil, errors.New("failed to decrypt KEK in auth manager")
-	}
-
-	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
-	kek, err = func() (*memguard.Enclave, error) {
-		var b64Encoded string
-		err = json.Unmarshal(body, &b64Encoded)
-		if err != nil {
-			return nil, err
-		}
-
-		splitted := strings.Split(b64Encoded, ";")
-		b64Raw := splitted[0]
-
-		b64Decoded, err := base64.StdEncoding.DecodeString(b64Raw)
-		if err != nil {
-			return nil, err
-		}
-
-		return memguard.NewEnclave(b64Decoded), nil
-	}()
-
+	handlers := internAPIUtils.NewHandlerMap("key", "keyMetadata")
+	data, err := internAPIUtils.ProcessMultipartResponse(res, handlers)
 	if err != nil {
 		return nil, err
 	}
 
-	return kek, nil
+	dekMeta, ok := data["keyMetadata"].(internAPIUtils.DEKIdentifier)
+	if !ok {
+		return nil, errors.New("unexpected type of metadata while retrieving DEK")
+	}
+	dbWrapper, err := dp.NewSQLWrapper(dc.DEKInfos.DB)
+	if err != nil {
+		return nil, err
+	}
+	if dbWrapper.DB == nil {
+		dbWrapper.Connect(context.Background(), 2)
+	}
+	dek, err := dbWrapper.GetKey(dekMeta.KEKBlind, "relation")
+	if err != nil {
+		return nil, err
+	}
+
+	kek, ok := data["key"].(*memguard.Enclave)
+	if !ok {
+		return nil, errors.New("unexpected type of KEK while retrieving DEK")
+	}
+
+	decryptedDEK, err := AesDecryption(dek.([]byte), kek)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptedDEK, nil
 }
 
 func CreateAESKey(keySize int) (*memguard.Enclave, error) {
@@ -310,7 +350,7 @@ func CreateAESKey(keySize int) (*memguard.Enclave, error) {
 	return key, nil
 }
 
-func CreateECCKey(publicDBStore keyFetcher) (*memguard.Enclave, error) {
+func CreateECCKey(publicDBStore wrapperUtils.MySQLWrapper) (*memguard.Enclave, error) {
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err

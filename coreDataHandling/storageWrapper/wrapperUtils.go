@@ -23,7 +23,7 @@ type DBWrapper interface {
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
 	GetKey(id string, individualref string) (any, error)
-	SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration) error
+	SetKey(id, relation, version string, key any, d *time.Duration) error
 }
 
 type DBPool struct {
@@ -163,7 +163,7 @@ func (r *RedisWrapper) GetKey(id string, individualref string) (any, error) {
 	return returnedData, nil
 }
 
-func (r *RedisWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration) error {
+func (r *RedisWrapper) SetKey(id, relation, version string, key any, d *time.Duration) error {
 	keyLocked, err := key.(*memguard.Enclave).Open()
 	if err != nil {
 		return err
@@ -171,10 +171,8 @@ func (r *RedisWrapper) SetKey(id, individualrelation, keyrelation, version strin
 
 	ret, err := func() (*redis.StatusCmd, error) {
 		var identifier string
-		if (individualrelation != "") {
-			identifier = individualrelation
-		} else if (keyrelation != "") {
-			identifier = keyrelation
+		if relation != "" {
+			identifier = relation 
 		} else {
 			identifier = id
 		}
@@ -207,9 +205,11 @@ type MySQLWrapper struct {
 
 func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error) {
 	if p.Pool[dbName] != nil {
-		err := p.Pool[dbName].Connect(context.Background(), 2)
-		if err != nil {
-			return nil, err
+		if p.Pool[dbName].(*MySQLWrapper).DB == nil {
+			err := p.Pool[dbName].Connect(context.Background(), 2)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return p.Pool[dbName].(*MySQLWrapper), nil
@@ -268,7 +268,7 @@ func (sr *MySQLWrapper) Close() error {
 
 // key is not handled in a enclave cause its already encrypted
 func (sr *MySQLWrapper) GetKey(id, idType string) (any, error) {
-	if (idType != "keyrelation" && idType != "individualrelation" && idType != "uniqueid") {
+	if (idType != "relation" && idType != "uniqueid") {
 		return nil, fmt.Errorf("invalid id type")
 	}
 
@@ -281,15 +281,14 @@ func (sr *MySQLWrapper) GetKey(id, idType string) (any, error) {
 	keySlice, ok := returnedValue.([]byte)
 	if !ok {
 		return nil, fmt.Errorf("failed to convert key to []byte")
-
 	}
 
 	return keySlice, nil
 }
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration) error {
-	_, err := sr.DB.Exec("INSERT INTO kstore (uniqueid, individualrelation, keyrelation, vers, k_val) VALUES (?, ?, ?, ?, ?)", id, individualrelation, keyrelation, version, key.([]byte))
+func (sr *MySQLWrapper) SetKey(id, relation, version string, key any, d *time.Duration) error {
+	_, err := sr.DB.Exec("INSERT INTO kstore (uniqueid, relation, keyrelation, vers, k_val) VALUES (?, ?, ?, ?, ?)", id, relation, version, key.([]byte))
 	if err != nil {
 		return err
 	}
