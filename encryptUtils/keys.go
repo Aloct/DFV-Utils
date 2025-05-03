@@ -46,14 +46,6 @@ type DEKCombKEK struct {
 	KEKInfos       *KEKRefs
 }
 
-type keyFetcher interface {
-	GetKey(id, idType string, stringToKey interface{}) (any, error)
-	SetKey(id, individualrelation, keyrelation, version string, key any, d *time.Duration, keyToString interface{}) error
-
-	GetData(query string, values []any) (any, error)
-	SetData(query string, values []any, n *time.Duration) error
-}
-
 type PartHandler func(io.Reader) (interface{}, error)
 
 func CreateDEKRefs(db, algorithm, scope, innerScope, cachingType string) *DEKRefs {
@@ -110,6 +102,9 @@ func (dc *DEKCombKEK) RegisterNewKEK(pool wrapperUtils.DBPool, publicDB wrapperU
 		subRequests = append(subRequests, internAPIUtils.NewStdRequest("createDEKRefs", defaultDEKs[i]))
 	}
 	w, err = internAPIUtils.SetSubRequestsForMultipartReq(w, subRequests)
+	if err != nil {
+		return err
+	}
 
 	kekRegister := internAPIUtils.NewKEKRegister(dc.KEKInfos.DB, dc.Scope, "", userBlind)
 	w, err = internAPIUtils.SetKeyMetaForMultipartReq(w, kek, kekRegister)
@@ -235,6 +230,9 @@ func (dc *DEKCombKEK) setNewDEKFromSet(keySet internAPIUtils.DEKIdentifier, dekD
 func (dc *DEKCombKEK) RegisterNewDEK(dekReg internAPIUtils.DEKRegister, dp wrapperUtils.DBPool, publicDB wrapperUtils.MySQLWrapper) error {
 	body := internAPIUtils.NewStdRequest("createDEKRefs", dekReg)
 	serialized, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/registerKEK", dc.KEKInfos.Manager), bytes.NewBuffer(serialized))
 	if err != nil {
@@ -276,15 +274,14 @@ func (dc *DEKCombKEK) RegisterNewDEK(dekReg internAPIUtils.DEKRegister, dp wrapp
 }
 
 // retrieve decrypted DEK to handle Data
-func (dc *DEKCombKEK) GetDEK(dekRefs internAPIUtils.DEKRegister, userRef string, dp wrapperUtils.DBPool) (*memguard.Enclave, error) {
+func (dc *DEKCombKEK) GetDEK(innerScope, userRef string, dp wrapperUtils.DBPool) (*memguard.Enclave, error) {
 	userBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, userRef, "KEK")
 	if err != nil {
 		return nil, err
 	}
-	kekIdentifier := internAPIUtils.NewKEKIdentifier(userRef, userBlind)
 
-	dekKEKSet := internAPIUtils.NewDEKKEKSet(dekRefs, kekIdentifier)
-	serialized, err := json.Marshal(internAPIUtils.NewStdRequest("decryptDEK", dekKEKSet))
+	getter := internAPIUtils.NewDEKGetter(internAPIUtils.NewKEKBlindedID(dc.KEKInfos.DB, userBlind), dc.DEKInfos.InnerScope)
+	serialized, err := json.Marshal(internAPIUtils.NewStdRequest("decryptDEK", getter))
 	if err != nil {
 		return nil, err
 	}
