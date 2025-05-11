@@ -221,7 +221,7 @@ func (dc *DEKCombKEK) setNewDEKFromSet(keySet internAPIUtils.DEKIdentifier, dekD
 	}
 
 	// store DEK in right DB
-	dekDB.SetKey(keySet.ID, relationBlind, "v1", encodedDEK, nil)
+	dekDB.SetKey(keySet.ID, relationBlind, "v1", dc.DEKInfos.Scope, dc.DEKInfos.InnerScope, encodedDEK, nil)
 
 	return nil
 }
@@ -255,9 +255,15 @@ func (dc *DEKCombKEK) RegisterNewDEK(dekReg internAPIUtils.DEKRegister, dp wrapp
 		return errors.New("unexpcted type of KEK while registering DEK")
 	}
 
-	dekMeta, ok := parts["keyMetadata"].(internAPIUtils.DEKIdentifier)
+	// DEKIdentifier
+	dekMetaRaw, ok := parts["keyMetadata"].([]byte)
 	if !ok {
 		return errors.New("unexpected type of metadata while registering DEK")
+	}
+	var dekMeta internAPIUtils.DEKIdentifier
+	err = json.Unmarshal(dekMetaRaw, &dekMeta)
+	if err != nil {
+		return err
 	}
 
 	dbWrapper, err := dp.NewSQLWrapper(dc.DEKInfos.DB)
@@ -302,9 +308,15 @@ func (dc *DEKCombKEK) GetDEK(innerScope, userRef string, dp wrapperUtils.DBPool)
 		return nil, err
 	}
 
-	dekMeta, ok := data["keyMetadata"].(internAPIUtils.DEKIdentifier)
+	// DEKIdentifier
+	dekMetaRaw, ok := data["keyMetadata"].([]byte)
 	if !ok {
 		return nil, errors.New("unexpected type of metadata while retrieving DEK")
+	}
+	var dekMeta internAPIUtils.DEKIdentifier
+	err = json.Unmarshal(dekMetaRaw, &dekMeta)
+	if err != nil {
+		return nil, err
 	}
 	dbWrapper, err := dp.NewSQLWrapper(dc.DEKInfos.DB)
 	if err != nil {

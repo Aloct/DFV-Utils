@@ -3,14 +3,9 @@ package apiConfig
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
-	"strings"
 
-	coreutils "github.com/Aloct/DFV-Utils/coreUtils"
 	errorHandler "github.com/Aloct/DFV-Utils/internAPIUtils/errorHandling"
 	"github.com/awnumar/memguard"
 )
@@ -83,163 +78,164 @@ func GetErrorResponse(r http.Response) (*errorHandler.HTTPErrorContext, error) {
 }
 
 // mulipart requests
-func ProcessMultipartResponse(resp *http.Response, handlers map[string]PartHandler) (map[string]interface{}, error) {
-	// Für Responses brauchen wir keinen ParseMultipartForm Aufruf
+// func ProcessMultipartResponse(resp *http.Response, handlers map[string]PartHandler) (map[string]interface{}, error) {
+// 	// Für Responses brauchen wir keinen ParseMultipartForm Aufruf
 	
-	// MultipartReader direkt aus der Response erstellen
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		return nil, fmt.Errorf("no Content-Type header found")
-	}
+// 	// MultipartReader direkt aus der Response erstellen
+// 	contentType := resp.Header.Get("Content-Type")
+// 	if contentType == "" {
+// 		return nil, fmt.Errorf("no Content-Type header found")
+// 	}
 	
-	mediaType, params, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		return nil, err
-	}
+// 	mediaType, params, err := mime.ParseMediaType(contentType)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 	
-	if !strings.HasPrefix(mediaType, "multipart/") {
-		return nil, fmt.Errorf("not a multipart response: %s", mediaType)
-	}
+// 	if !strings.HasPrefix(mediaType, "multipart/") {
+// 		return nil, fmt.Errorf("not a multipart response: %s", mediaType)
+// 	}
 	
-	boundary, ok := params["boundary"]
-	if !ok {
-		return nil, fmt.Errorf("no boundary parameter found in Content-Type")
-	}
+// 	boundary, ok := params["boundary"]
+// 	if !ok {
+// 		return nil, fmt.Errorf("no boundary parameter found in Content-Type")
+// 	}
 	
-	reader := multipart.NewReader(resp.Body, boundary)
+// 	reader := multipart.NewReader(resp.Body, boundary)
 
-	results, err := multiPartLoop(reader, handlers)
-	if err != nil {
-		return nil, err
-	}
+// 	results, err := multiPartLoop(reader, handlers)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 	
-	return results, nil
-}  
+// 	return results, nil
+// }  
 
-func ProcessMultipartRequest(r *http.Request, handlers map[string]PartHandler) (map[string]interface{}, error) {
-	// MultipartReader direkt aus der Request erstellen
-	contentType := r.Header.Get("Content-Type")
-	if contentType == "" {
-		return nil, fmt.Errorf("no Content-Type header found")
-	}
+// func ProcessMultipartRequest(r *http.Request, handlers map[string]PartHandler) (map[string]interface{}, error) {
+// 	// MultipartReader direkt aus der Request erstellen
+// 	contentType := r.Header.Get("Content-Type")
+// 	if contentType == "" {
+// 		return nil, fmt.Errorf("no Content-Type header found")
+// 	}
 	
-	mediaType, params, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		return nil, err
-	}
+// 	mediaType, params, err := mime.ParseMediaType(contentType)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 	
-	if !strings.HasPrefix(mediaType, "multipart/") {
-		return nil, fmt.Errorf("not a multipart request: %s", mediaType)
-	}
+// 	if !strings.HasPrefix(mediaType, "multipart/") {
+// 		return nil, fmt.Errorf("not a multipart request: %s", mediaType)
+// 	}
 	
-	boundary, ok := params["boundary"]
-	if !ok {
-		return nil, fmt.Errorf("no boundary parameter found in Content-Type")
-	}
+// 	boundary, ok := params["boundary"]
+// 	if !ok {
+// 		return nil, fmt.Errorf("no boundary parameter found in Content-Type")
+// 	}
 	
-	reader := multipart.NewReader(r.Body, boundary)
+// 	reader := multipart.NewReader(r.Body, boundary)
 
-	results, err := multiPartLoop(reader, handlers)
-	if err != nil {
-		return nil, err
-	}
+// 	results, err := multiPartLoop(reader, handlers)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 	
-	return results, nil
-}
+// 	return results, nil
+// }
 
-func multiPartLoop(reader *multipart.Reader, handlers map[string]PartHandler) (map[string]interface{}, error) {
-	results := make(map[string]interface{})
+// func multiPartLoop(reader *multipart.Reader, handlers map[string]PartHandler) (map[string]interface{}, error) {
+// 	results := make(map[string]interface{})
 
-	for {
-		part, err := reader.NextPart()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
+// 	for {
+// 		part, err := reader.NextPart()
+// 		if err == io.EOF {
+// 			break
+// 		}
+// 		if err != nil {
+// 			return nil, err
+// 		}
 		
-		formName := part.FormName()
-		handler, exists := handlers[formName]
+// 		formName := part.FormName()
+// 		handler, exists := handlers[formName]
 		
-		if exists {
-			result, err := handler(part)
-			if err != nil {
-				return nil, err
-			}
-			results[formName] = result
-		}
-	}
+// 		if exists {
+// 			result, err := handler(part)
+// 			if err != nil {
+// 				return nil, err
+// 			}
+// 			results[formName] = result
+// 		}
+// 	}
 	
-	// Check if all required handlers were applied
-	for name := range handlers {
-		if _, exists := results[name]; !exists {
-			if name == "subResponses" { // Umbenannt von subRequests zu subResponses
-				results[name] = nil
-			} else {
-				return nil, fmt.Errorf("missing required part: %s", name)
-			}
-		}
-	}
+// 	// Check if all required handlers were applied
+// 	for name := range handlers {
+// 		if _, exists := results[name]; !exists {
+// 			if name == "subResponses" { // Umbenannt von subRequests zu subResponses
+// 				results[name] = nil
+// 			} else {
+// 				return nil, fmt.Errorf("missing required part: %s", name)
+// 			}
+// 		}
+// 	}
 
-	return results, nil
-}
+// 	return results, nil
+// }
 
-func NewHandlerMap(expectedData ...string) map[string]PartHandler {
-	handlers := make(map[string]PartHandler)
-	for _, data := range expectedData {
-		switch data {
-		case "keyMetadata":
-			handlers[data] = MetadataHandler
-		case "key":
-			handlers[data] = KeyHandler
-		case "subRequests":
-			handlers[data] = SubRequestHandler
-		default:
-			panic(fmt.Sprintf("unknown part type: %s", data))
-		}
-	}
-	return handlers
-}
+// func NewHandlerMap(expectedData ...string) map[string]PartHandler {
+// 	handlers := make(map[string]PartHandler)
+// 	for _, data := range expectedData {
+// 		switch data {
+// 		case "keyMetadata":
+// 			handlers[data] = MetadataHandler
+// 		case "key":
+// 			handlers[data] = KeyHandler
+// 		case "subRequests":
+// 			handlers[data] = SubRequestHandler
+// 		default:
+// 			panic(fmt.Sprintf("unknown part type: %s", data))
+// 		}
+// 	}
+// 	return handlers
+// }
 
-func MetadataHandler(part io.Reader) (interface{}, error) {
-	metadataBytes, err := io.ReadAll(part)
-	if err != nil {
-		return nil, err
-	}
+// // returns json
+// func MetadataHandler(part io.Reader) (interface{}, error) {
+// 	metadataBytes, err := io.ReadAll(part)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	var metadata interface{}
-	err = json.Unmarshal(metadataBytes, &metadata)
-	if err != nil {
-		return nil, err
-	}
+// 	// var metadata interface{}
+// 	// err = json.Unmarshal(metadataBytes, &metadata)
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
 
-	return metadata, nil
-}
+// 	return metadataBytes, nil
+// }
 
-func KeyHandler(part io.Reader) (interface{}, error) {
-	keyData, err := io.ReadAll(part)
-	if err != nil {
-		return nil, err
-	}
+// func KeyHandler(part io.Reader) (interface{}, error) {
+// 	keyData, err := io.ReadAll(part)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	enclave := memguard.NewEnclave(keyData)
-	coreutils.ToZero(keyData)
+// 	enclave := memguard.NewEnclave(keyData)
+// 	coreutils.ToZero(keyData)
 
-	return enclave, nil
-}
+// 	return enclave, nil
+// }
 
-func SubRequestHandler(part io.Reader) (interface{}, error) {
-	subRequestBytes, err := io.ReadAll(part)
-	if err != nil {
-		return nil, err
-	}
+// func SubRequestHandler(part io.Reader) (interface{}, error) {
+// 	subRequestBytes, err := io.ReadAll(part)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	var subRequest interface{}
-	err = json.Unmarshal(subRequestBytes, &subRequest)
-	if err != nil {
-		return nil, err
-	}
+// 	var subRequest GroupRequest
+// 	err = json.Unmarshal(subRequestBytes, &subRequest)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return subRequest, nil
-}
+// 	return subRequest, nil
+// }

@@ -23,7 +23,7 @@ type DBWrapper interface {
 	GetData(query string, values []any) (any, error)
 	SetData(query string, values []any, duration *time.Duration) error
 	GetKey(id string, individualref string) (any, error)
-	SetKey(id, relation, version string, key any, d *time.Duration) error
+	SetKey(id, relation, version, scope, innerScope string, key any, d *time.Duration) error
 }
 
 type DBPool struct {
@@ -163,7 +163,7 @@ func (r *RedisWrapper) GetKey(id string, individualref string) (any, error) {
 	return returnedData, nil
 }
 
-func (r *RedisWrapper) SetKey(id, relation, version string, key any, d *time.Duration) error {
+func (r *RedisWrapper) SetKey(id, relation, version, scope, innerScope string, key any, d *time.Duration) error {
 	keyLocked, err := key.(*memguard.Enclave).Open()
 	if err != nil {
 		return err
@@ -287,10 +287,17 @@ func (sr *MySQLWrapper) GetKey(id, idType string) (any, error) {
 }
 
 // key is not handled in a enclave cause its already encrypted
-func (sr *MySQLWrapper) SetKey(id, relation, version string, key any, d *time.Duration) error {
-	_, err := sr.DB.Exec("INSERT INTO kstore (uniqueid, relation, keyrelation, vers, k_val) VALUES (?, ?, ?, ?, ?)", id, relation, version, key.([]byte))
-	if err != nil {
-		return err
+func (sr *MySQLWrapper) SetKey(id, relation, version, scope, innerScope string, key any, d *time.Duration) error {
+	if innerScope != "" {
+		_, err := sr.DB.Exec("INSERT INTO kstore (uniqueid, relation, vers, scope, innerscope, k_val) VALUES (?, ?, ?, ?, ?, ?)", id, relation, version, scope, innerScope, key.([]byte))
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err := sr.DB.Exec("INSERT INTO kstore (uniqueid, relation, vers, scope, k_val) VALUES (?, ?, ?, ?, ?)", id, relation, version, scope, key.([]byte))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

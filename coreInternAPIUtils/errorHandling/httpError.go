@@ -19,6 +19,7 @@ var loginURL = "http://localhost:8081/login"
 // 6002 - internal server error, try again later
 // 6003 - bad request, add ...
 // 6004 - third party error, try again later
+// 7001 - created
 
 func CreateHTTPError(internalCode int, context string, addInfo string) (*HTTPErrorContext, error) {
 	switch internalCode {

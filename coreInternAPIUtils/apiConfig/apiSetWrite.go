@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"mime/multipart"
 	"net/http"
 
 	errorHandler "github.com/Aloct/DFV-Utils/internAPIUtils/errorHandling"
@@ -77,53 +76,53 @@ func SetEnclaveAsJSON(w http.ResponseWriter, key *memguard.Enclave) error {
 }
 
 // mulipart requests
-func SetKeyMetaForMultipartReq(w *multipart.Writer, key *memguard.Enclave, metadata interface{}) (*multipart.Writer, error) {
-	keyPart, err := w.CreateFormFile("key", "keyfile")
-	if err != nil {
-		return nil, err
-	}
+// func SetKeyMetaForMultipartReq(w *multipart.Writer, key *memguard.Enclave, metadata interface{}) (*multipart.Writer, error) {
+// 	keyPart, err := w.CreateFormFile("key", "keyfile")
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	keyBuf, err := key.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer keyBuf.Destroy()
-	_, err = keyPart.Write(keyBuf.Bytes())
-	if err != nil {
-		return nil, err
-	}
+// 	keyBuf, err := key.Open()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer keyBuf.Destroy()
+// 	_, err = keyPart.Write(keyBuf.Bytes())
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	keyMetas, err := w.CreateFormField("keyMetadata")
-	if err != nil {
-		return nil, err
-	}
+// 	keyMetas, err := w.CreateFormField("keyMetadata")
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	serialized, err := json.Marshal(metadata)
-	if err != nil {
-		return nil, err
-	}
-	_, err = keyMetas.Write(serialized)
-	if err != nil {
-		return nil, err
-	}
+// 	serialized, err := json.Marshal(metadata)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	_, err = keyMetas.Write(serialized)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return w, nil
-}
+// 	return w, nil
+// }
 
-func SetSubRequestsForMultipartReq(w *multipart.Writer, subRequests... []StdRequest) (*multipart.Writer, error) {
-	subPart, err := w.CreateFormField("subRequests")
-	if err != nil {
-		return nil, err
-	}
+// func SetSubRequestsForMultipartReq(w *multipart.Writer, subRequests... []StdRequest) (*multipart.Writer, error) {
+// 	subPart, err := w.CreateFormField("subRequests")
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	serialized, err := json.Marshal(subRequests)
-	if err != nil {
-		return nil, err
-	}
-	_, err = subPart.Write(serialized)
-	if err != nil {
-		return nil, err
-	}
+// 	serialized, err := json.Marshal(subRequests)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	_, err = subPart.Write(serialized)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return w, nil
-}
+// 	return w, nil
+// }

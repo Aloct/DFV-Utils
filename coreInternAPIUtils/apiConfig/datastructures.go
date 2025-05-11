@@ -27,103 +27,103 @@ func NewStdRequest(context string, data interface{}) StdRequest {
 	}
 }
 
-type groupMessage struct {
-	Context string        `json:"context"`
-	Subs    []interface{} `json:"subs"`
-}
+// type groupMessage struct {
+// 	Context string        `json:"context"`
+// 	Subs    []interface{} `json:"subs"`
+// }
 
-type GroupResponse = groupMessage
-type GroupRequest = groupMessage
+// type GroupResponse = groupMessage
+// type GroupRequest = groupMessage
 
-func NewGroupResponse(context string, subResponses ...interface{}) interface{} {
-	return GroupResponse{
-		Context: context,
-		Subs:    subResponses,
-	}
-}
+// func NewGroupResponse(context string, subResponses ...interface{}) interface{} {
+// 	return GroupResponse{
+// 		Context: context,
+// 		Subs:    subResponses,
+// 	}
+// }
 
-func NewGroupRequest(context string, subRequests ...interface{}) interface{} {
-	return GroupRequest{
-		Context: context,
-		Subs:    subRequests,
-	}
-}
+// func NewGroupRequest(context string, subRequests ...interface{}) interface{} {
+// 	return GroupRequest{
+// 		Context: context,
+// 		Subs:    subRequests,
+// 	}
+// }
 
-type DEKRegister struct {
-	ID    string `json:"id"`
-	InnerScope string `json:"scope"`
-}
+// type DEKRegister struct {
+// 	ID    string `json:"id"`
+// 	InnerScope string `json:"scope"`
+// }
 
-func NewDEKRegister(id, scope string) DEKRegister {
-	return DEKRegister{
-		ID:    id,
-		InnerScope: scope,
-	}
-}
+// func NewDEKRegister(id, scope string) DEKRegister {
+// 	return DEKRegister{
+// 		ID:    id,
+// 		InnerScope: scope,
+// 	}
+// }
 
-type KEKRegister struct {
-	KEKDB     string `json:"kekdb"`
-	Scope     string `json:"scope"`
-	ID        string `json:"id"`
-	UserBlind string `json:"userblind"`
-}
+// type KEKRegister struct {
+// 	KEKDB     string `json:"kekdb"`
+// 	Scope     string `json:"scope"`
+// 	ID        string `json:"id"`
+// 	UserBlind string `json:"userblind"`
+// }
 
-func NewKEKRegister(kekdb, scope, id, userBlind string) KEKRegister {
-	return KEKRegister{
-		KEKDB:     kekdb,
-		Scope:     scope,
-		ID:        id,
-		UserBlind: userBlind,
-	}
-}
+// func NewKEKRegister(kekdb, scope, id, userBlind string) KEKRegister {
+// 	return KEKRegister{
+// 		KEKDB:     kekdb,
+// 		Scope:     scope,
+// 		ID:        id,
+// 		UserBlind: userBlind,
+// 	}
+// }
 
-type KEKBlindedID struct {
-	KEKDB     string `json:"kekdb"`
-	UserBlind string `json:"userblind"`
-}
+// type KEKBlindedID struct {
+// 	KEKDB     string `json:"kekdb"`
+// 	UserBlind string `json:"userblind"`
+// }
 
-func NewKEKBlindedID(kekdb, userblind string) KEKBlindedID {
-	return KEKBlindedID{
-		KEKDB:     kekdb,
-		UserBlind: userblind,
-	}
-}
+// func NewKEKBlindedID(kekdb, userblind string) KEKBlindedID {
+// 	return KEKBlindedID{
+// 		KEKDB:     kekdb,
+// 		UserBlind: userblind,
+// 	}
+// }
 
-type DEKIdentifier struct {
-	ID       string `json:"id"`
-	KEKBlind string `json:"kekblind"`
-}
+// type DEKIdentifier struct {
+// 	ID       string `json:"id"`
+// 	KEKBlind string `json:"kekblind"`
+// }
 
-func NewDEKIdentifier(id, kekBlind string) DEKIdentifier {
-	return DEKIdentifier{
-		ID:       id,
-		KEKBlind: kekBlind,
-	}
-}
+// func NewDEKIdentifier(id, kekBlind string) DEKIdentifier {
+// 	return DEKIdentifier{
+// 		ID:       id,
+// 		KEKBlind: kekBlind,
+// 	}
+// }
 
-type DEKKEKRegisterSet struct {
-	DEKRegister  `json:"dekset"`
-	KEKBlindedID `json:"kekset"`
-}
+// type DEKKEKRegisterSet struct {
+// 	DEKRegister  `json:"dekset"`
+// 	KEKBlindedID `json:"kekset"`
+// }
 
-func NewDEKKEKSet(dekRegister DEKRegister, kekIdentifier KEKBlindedID) DEKKEKRegisterSet {
-	return DEKKEKRegisterSet{
-		DEKRegister:  dekRegister,
-		KEKBlindedID: kekIdentifier,
-	}
-}
+// func NewDEKKEKSet(dekRegister DEKRegister, kekIdentifier KEKBlindedID) DEKKEKRegisterSet {
+// 	return DEKKEKRegisterSet{
+// 		DEKRegister:  dekRegister,
+// 		KEKBlindedID: kekIdentifier,
+// 	}
+// }
 
-type DEKGetter struct {
-	KEKBlindedID  `json:"kekblindedid"`
-	InnerDEKScope string `json:"innerdekscope"`
-}
+// type DEKGetter struct {
+// 	KEKBlindedID  `json:"kekblindedid"`
+// 	InnerDEKScope string `json:"innerdekscope"`
+// }
 
-func NewDEKGetter(kekBlindedID KEKBlindedID, innerDEKScope string) DEKGetter {
-	return DEKGetter{
-		KEKBlindedID:  kekBlindedID,
-		InnerDEKScope: innerDEKScope,
-	}
-}
+// func NewDEKGetter(kekBlindedID KEKBlindedID, innerDEKScope string) DEKGetter {
+// 	return DEKGetter{
+// 		KEKBlindedID:  kekBlindedID,
+// 		InnerDEKScope: innerDEKScope,
+// 	}
+// }
 
 type PasetoIdentifier struct {
 	APaseto     string `json:"apaseto"`

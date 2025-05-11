@@ -4,29 +4,33 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
 	"github.com/awnumar/memguard"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
-type API struct {
+// REST-API
+type RestAPI struct {
 	Router *mux.Router
     Port string
     Protected bool
 }
 
-func NewAPI(port string, protected bool) *API {
-    return &API{
+func NewRestAPI(port string, protected bool) *RestAPI {
+    return &RestAPI{
         Router: mux.NewRouter(),
         Port: port,
         Protected: protected, 
     }
 }
 
-func (s *API) AddRoute(path string, method string, handlerFunc http.Handler, givenMiddlewares ...func(http.Handler) http.Handler) {
+func (s *RestAPI) AddRoute(path string, method string, handlerFunc http.Handler, givenMiddlewares ...func(http.Handler) http.Handler) {
     middlewares := append([]func(http.Handler) http.Handler{Auth}, givenMiddlewares...)
     var handler http.Handler = handlerFunc
     for _, middleware := range middlewares {
@@ -36,7 +40,7 @@ func (s *API) AddRoute(path string, method string, handlerFunc http.Handler, giv
     s.Router.Handle(path, handler).Methods(method)
 }
 
-func (s *API) Start() error {
+func (s *RestAPI) Start() error {
     if (s.Protected) {
         memguard.CatchInterrupt()
         defer memguard.Purge()
@@ -94,4 +98,48 @@ func (s *API) Start() error {
     }
 
     return nil
+}
+
+// gRPC-API 
+type GRPCServer struct {
+    Port       string
+    TLSConfig  *tls.Config
+    Server     *grpc.Server
+    RegisterFn func(*grpc.Server) // hook to register services
+}
+
+func NewGRPCServer(port string, tlsConfig *tls.Config, registerFn func(*grpc.Server)) *GRPCServer {
+    return &GRPCServer{
+        Port:       port,
+        TLSConfig:  tlsConfig,
+        RegisterFn: registerFn,
+    }
+}
+
+func (g *GRPCServer) Start() error {
+    lis, err := net.Listen("tcp", ":"+g.Port)
+    if err != nil {
+        return fmt.Errorf("failed to listen: %w", err)
+    }
+
+    var opts []grpc.ServerOption
+    if g.TLSConfig != nil {
+        creds := credentials.NewTLS(g.TLSConfig)
+        opts = append(opts, grpc.Creds(creds))
+    }
+
+    g.Server = grpc.NewServer(opts...)
+
+    if g.RegisterFn != nil {
+        g.RegisterFn(g.Server)
+    }
+
+    fmt.Printf("gRPC server started on port %s\n", g.Port)
+    return g.Server.Serve(lis)
+}
+
+func (g *GRPCServer) Stop() {
+    if g.Server != nil {
+        g.Server.GracefulStop()
+    }
 }

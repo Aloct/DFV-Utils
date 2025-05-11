@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package keymanager;
+option go_package = "github.com/Aloct/DFV/internAPIUtils/keyManagerProto";
+
+service KeyManager {
+  rpc DecryptKEKAndGetReference(DEKGetter) returns (DEKIdentAndKEK);
+  rpc RegisterKEK(stream KEKAndDefaultDEKs) returns (stream RegisterResponse);
+  rpc RegisterDEK(DEKRegistration) returns (DEKBlindResult);
+}
+
+// --- Universal Types ---
+
+message Status {
+  int32 status_code = 1;
+  int32 assigned_id = 2;
+  string message = 3;
+}
+
+message RegisterResponse {
+  oneof register_result {
+    Status status = 1;               // Used for KEK
+    DEKBlindResult dek_result = 2;   // Used for DEKs
+  }
+}
+
+// --- Streaming Connection Type ---
+
+message KEKAndDefaultDEKs {
+  oneof data {
+    KEKRegistration kek = 1;              // Should be sent once
+    DEKDefaultRegistration dek = 2;       // Optional, multiple
+  }
+}
+
+// --- KEK Related Types ---
+
+message KEKGetter {
+  string kek_db = 1;
+  string user_blind = 2;
+}
+
+message KEKRegistration {
+  string scope = 1;
+  DEKGetter id_params = 2;
+}
+
+// --- DEK Related Types ---
+
+message DEKGetter {
+  string inner_scope = 1;
+  string kek_db = 2;
+  string user_blind = 3;
+}
+
+message DEKIdentAndKEK {
+  string kek_blind = 1;
+  bytes kek = 2;
+}
+
+message DEKDefaultRegistration {
+  string inner_scope = 1;
+  string scope = 2;
+}
+
+message DEKRegistration {
+  KEKGetter kek_id = 1;
+  DEKDefaultRegistration dek_id = 2;
+}
+
+message DEKBlindResult {
+  string id = 1;
+  string kek_blind = 2;
+}
