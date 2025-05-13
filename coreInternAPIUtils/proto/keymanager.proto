@@ -6,7 +6,7 @@ option go_package = "github.com/Aloct/DFV/internAPIUtils/keyManagerProto";
 service KeyManager {
   rpc DecryptKEKAndGetReference(DEKGetter) returns (DEKIdentAndKEK);
   rpc RegisterKEK(stream KEKAndDefaultDEKs) returns (stream RegisterResponse);
-  rpc RegisterDEK(DEKRegistration) returns (DEKBlindResult);
+  rpc RegisterDEK(DEKRegistration) returns (DekRegisterAndKEK);
 }
 
 // --- Universal Types ---
@@ -22,6 +22,11 @@ message RegisterResponse {
     Status status = 1;               // Used for KEK
     DEKBlindResult dek_result = 2;   // Used for DEKs
   }
+}
+
+message DekRegisterAndKEK {
+  bytes kek = 1;
+  DEKBlindResult dekId = 2;
 }
 
 // --- Streaming Connection Type ---
@@ -70,5 +75,6 @@ message DEKRegistration {
 
 message DEKBlindResult {
   string id = 1;
-  string kek_blind = 2;
+  string inner_scope = 2;
+  string kek_blind = 3;
 }

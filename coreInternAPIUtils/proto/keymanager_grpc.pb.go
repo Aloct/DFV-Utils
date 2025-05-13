@@ -30,7 +30,7 @@ const (
 type KeyManagerClient interface {
 	DecryptKEKAndGetReference(ctx context.Context, in *DEKGetter, opts ...grpc.CallOption) (*DEKIdentAndKEK, error)
 	RegisterKEK(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[KEKAndDefaultDEKs, RegisterResponse], error)
-	RegisterDEK(ctx context.Context, in *DEKRegistration, opts ...grpc.CallOption) (*DEKBlindResult, error)
+	RegisterDEK(ctx context.Context, in *DEKRegistration, opts ...grpc.CallOption) (*DekRegisterAndKEK, error)
 }
 
 type keyManagerClient struct {
@@ -64,9 +64,9 @@ func (c *keyManagerClient) RegisterKEK(ctx context.Context, opts ...grpc.CallOpt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type KeyManager_RegisterKEKClient = grpc.BidiStreamingClient[KEKAndDefaultDEKs, RegisterResponse]
 
-func (c *keyManagerClient) RegisterDEK(ctx context.Context, in *DEKRegistration, opts ...grpc.CallOption) (*DEKBlindResult, error) {
+func (c *keyManagerClient) RegisterDEK(ctx context.Context, in *DEKRegistration, opts ...grpc.CallOption) (*DekRegisterAndKEK, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DEKBlindResult)
+	out := new(DekRegisterAndKEK)
 	err := c.cc.Invoke(ctx, KeyManager_RegisterDEK_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func (c *keyManagerClient) RegisterDEK(ctx context.Context, in *DEKRegistration,
 type KeyManagerServer interface {
 	DecryptKEKAndGetReference(context.Context, *DEKGetter) (*DEKIdentAndKEK, error)
 	RegisterKEK(grpc.BidiStreamingServer[KEKAndDefaultDEKs, RegisterResponse]) error
-	RegisterDEK(context.Context, *DEKRegistration) (*DEKBlindResult, error)
+	RegisterDEK(context.Context, *DEKRegistration) (*DekRegisterAndKEK, error)
 	mustEmbedUnimplementedKeyManagerServer()
 }
 
@@ -97,7 +97,7 @@ func (UnimplementedKeyManagerServer) DecryptKEKAndGetReference(context.Context, 
 func (UnimplementedKeyManagerServer) RegisterKEK(grpc.BidiStreamingServer[KEKAndDefaultDEKs, RegisterResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method RegisterKEK not implemented")
 }
-func (UnimplementedKeyManagerServer) RegisterDEK(context.Context, *DEKRegistration) (*DEKBlindResult, error) {
+func (UnimplementedKeyManagerServer) RegisterDEK(context.Context, *DEKRegistration) (*DekRegisterAndKEK, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterDEK not implemented")
 }
 func (UnimplementedKeyManagerServer) mustEmbedUnimplementedKeyManagerServer() {}
