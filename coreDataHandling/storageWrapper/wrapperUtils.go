@@ -204,6 +204,11 @@ type MySQLWrapper struct {
 }
 
 func (p DBPool) NewSQLWrapper(dbName string) (*MySQLWrapper, error) {
+	err := godotenv.Load(".env")
+	if err != nil {
+		return nil, err
+	}
+
 	if p.Pool[dbName] != nil {
 		if p.Pool[dbName].(*MySQLWrapper).DB == nil {
 			err := p.Pool[dbName].Connect(context.Background(), 2)

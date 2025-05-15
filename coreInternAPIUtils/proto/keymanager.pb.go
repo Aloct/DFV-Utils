@@ -21,71 +21,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Status struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StatusCode    int32                  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
-	AssignedId    int32                  `protobuf:"varint,2,opt,name=assigned_id,json=assignedId,proto3" json:"assigned_id,omitempty"`
-	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Status) Reset() {
-	*x = Status{}
-	mi := &file_keymanager_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Status) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Status) ProtoMessage() {}
-
-func (x *Status) ProtoReflect() protoreflect.Message {
-	mi := &file_keymanager_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Status.ProtoReflect.Descriptor instead.
-func (*Status) Descriptor() ([]byte, []int) {
-	return file_keymanager_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *Status) GetStatusCode() int32 {
-	if x != nil {
-		return x.StatusCode
-	}
-	return 0
-}
-
-func (x *Status) GetAssignedId() int32 {
-	if x != nil {
-		return x.AssignedId
-	}
-	return 0
-}
-
-func (x *Status) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
 type RegisterResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to RegisterResult:
 	//
-	//	*RegisterResponse_Status
+	//	*RegisterResponse_KekResult
 	//	*RegisterResponse_DekResult
 	RegisterResult isRegisterResponse_RegisterResult `protobuf_oneof:"register_result"`
 	unknownFields  protoimpl.UnknownFields
@@ -94,7 +34,7 @@ type RegisterResponse struct {
 
 func (x *RegisterResponse) Reset() {
 	*x = RegisterResponse{}
-	mi := &file_keymanager_proto_msgTypes[1]
+	mi := &file_keymanager_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -106,7 +46,7 @@ func (x *RegisterResponse) String() string {
 func (*RegisterResponse) ProtoMessage() {}
 
 func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_keymanager_proto_msgTypes[1]
+	mi := &file_keymanager_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -119,7 +59,7 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
 func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_keymanager_proto_rawDescGZIP(), []int{1}
+	return file_keymanager_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RegisterResponse) GetRegisterResult() isRegisterResponse_RegisterResult {
@@ -129,10 +69,10 @@ func (x *RegisterResponse) GetRegisterResult() isRegisterResponse_RegisterResult
 	return nil
 }
 
-func (x *RegisterResponse) GetStatus() *Status {
+func (x *RegisterResponse) GetKekResult() *KEKCreated {
 	if x != nil {
-		if x, ok := x.RegisterResult.(*RegisterResponse_Status); ok {
-			return x.Status
+		if x, ok := x.RegisterResult.(*RegisterResponse_KekResult); ok {
+			return x.KekResult
 		}
 	}
 	return nil
@@ -151,15 +91,15 @@ type isRegisterResponse_RegisterResult interface {
 	isRegisterResponse_RegisterResult()
 }
 
-type RegisterResponse_Status struct {
-	Status *Status `protobuf:"bytes,1,opt,name=status,proto3,oneof"` // Used for KEK
+type RegisterResponse_KekResult struct {
+	KekResult *KEKCreated `protobuf:"bytes,1,opt,name=kek_result,json=kekResult,proto3,oneof"` // Used for KEK
 }
 
 type RegisterResponse_DekResult struct {
 	DekResult *DEKBlindResult `protobuf:"bytes,2,opt,name=dek_result,json=dekResult,proto3,oneof"` // Used for DEKs
 }
 
-func (*RegisterResponse_Status) isRegisterResponse_RegisterResult() {}
+func (*RegisterResponse_KekResult) isRegisterResponse_RegisterResult() {}
 
 func (*RegisterResponse_DekResult) isRegisterResponse_RegisterResult() {}
 
@@ -173,7 +113,7 @@ type DekRegisterAndKEK struct {
 
 func (x *DekRegisterAndKEK) Reset() {
 	*x = DekRegisterAndKEK{}
-	mi := &file_keymanager_proto_msgTypes[2]
+	mi := &file_keymanager_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -185,7 +125,7 @@ func (x *DekRegisterAndKEK) String() string {
 func (*DekRegisterAndKEK) ProtoMessage() {}
 
 func (x *DekRegisterAndKEK) ProtoReflect() protoreflect.Message {
-	mi := &file_keymanager_proto_msgTypes[2]
+	mi := &file_keymanager_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -198,7 +138,7 @@ func (x *DekRegisterAndKEK) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DekRegisterAndKEK.ProtoReflect.Descriptor instead.
 func (*DekRegisterAndKEK) Descriptor() ([]byte, []int) {
-	return file_keymanager_proto_rawDescGZIP(), []int{2}
+	return file_keymanager_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *DekRegisterAndKEK) GetKek() []byte {
@@ -228,7 +168,7 @@ type KEKAndDefaultDEKs struct {
 
 func (x *KEKAndDefaultDEKs) Reset() {
 	*x = KEKAndDefaultDEKs{}
-	mi := &file_keymanager_proto_msgTypes[3]
+	mi := &file_keymanager_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -240,7 +180,7 @@ func (x *KEKAndDefaultDEKs) String() string {
 func (*KEKAndDefaultDEKs) ProtoMessage() {}
 
 func (x *KEKAndDefaultDEKs) ProtoReflect() protoreflect.Message {
-	mi := &file_keymanager_proto_msgTypes[3]
+	mi := &file_keymanager_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -253,7 +193,7 @@ func (x *KEKAndDefaultDEKs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KEKAndDefaultDEKs.ProtoReflect.Descriptor instead.
 func (*KEKAndDefaultDEKs) Descriptor() ([]byte, []int) {
-	return file_keymanager_proto_rawDescGZIP(), []int{3}
+	return file_keymanager_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *KEKAndDefaultDEKs) GetData() isKEKAndDefaultDEKs_Data {
@@ -307,7 +247,7 @@ type KEKGetter struct {
 
 func (x *KEKGetter) Reset() {
 	*x = KEKGetter{}
-	mi := &file_keymanager_proto_msgTypes[4]
+	mi := &file_keymanager_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -319,7 +259,7 @@ func (x *KEKGetter) String() string {
 func (*KEKGetter) ProtoMessage() {}
 
 func (x *KEKGetter) ProtoReflect() protoreflect.Message {
-	mi := &file_keymanager_proto_msgTypes[4]
+	mi := &file_keymanager_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -332,7 +272,7 @@ func (x *KEKGetter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KEKGetter.ProtoReflect.Descriptor instead.
 func (*KEKGetter) Descriptor() ([]byte, []int) {
-	return file_keymanager_proto_rawDescGZIP(), []int{4}
+	return file_keymanager_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *KEKGetter) GetKekDb() string {
@@ -359,7 +299,7 @@ type KEKRegistration struct {
 
 func (x *KEKRegistration) Reset() {
 	*x = KEKRegistration{}
-	mi := &file_keymanager_proto_msgTypes[5]
+	mi := &file_keymanager_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -371,7 +311,7 @@ func (x *KEKRegistration) String() string {
 func (*KEKRegistration) ProtoMessage() {}
 
 func (x *KEKRegistration) ProtoReflect() protoreflect.Message {
-	mi := &file_keymanager_proto_msgTypes[5]
+	mi := &file_keymanager_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -384,7 +324,7 @@ func (x *KEKRegistration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KEKRegistration.ProtoReflect.Descriptor instead.
 func (*KEKRegistration) Descriptor() ([]byte, []int) {
-	return file_keymanager_proto_rawDescGZIP(), []int{5}
+	return file_keymanager_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *KEKRegistration) GetScope() string {
@@ -397,6 +337,50 @@ func (x *KEKRegistration) GetScope() string {
 func (x *KEKRegistration) GetIdParams() *DEKGetter {
 	if x != nil {
 		return x.IdParams
+	}
+	return nil
+}
+
+type KEKCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kek           []byte                 `protobuf:"bytes,1,opt,name=kek,proto3" json:"kek,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KEKCreated) Reset() {
+	*x = KEKCreated{}
+	mi := &file_keymanager_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KEKCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KEKCreated) ProtoMessage() {}
+
+func (x *KEKCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_keymanager_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KEKCreated.ProtoReflect.Descriptor instead.
+func (*KEKCreated) Descriptor() ([]byte, []int) {
+	return file_keymanager_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *KEKCreated) GetKek() []byte {
+	if x != nil {
+		return x.Kek
 	}
 	return nil
 }
@@ -682,15 +666,10 @@ var File_keymanager_proto protoreflect.FileDescriptor
 const file_keymanager_proto_rawDesc = "" +
 	"\n" +
 	"\x10keymanager.proto\x12\n" +
-	"keymanager\"d\n" +
-	"\x06Status\x12\x1f\n" +
-	"\vstatus_code\x18\x01 \x01(\x05R\n" +
-	"statusCode\x12\x1f\n" +
-	"\vassigned_id\x18\x02 \x01(\x05R\n" +
-	"assignedId\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\x90\x01\n" +
-	"\x10RegisterResponse\x12,\n" +
-	"\x06status\x18\x01 \x01(\v2\x12.keymanager.StatusH\x00R\x06status\x12;\n" +
+	"keymanager\"\x9b\x01\n" +
+	"\x10RegisterResponse\x127\n" +
+	"\n" +
+	"kek_result\x18\x01 \x01(\v2\x16.keymanager.KEKCreatedH\x00R\tkekResult\x12;\n" +
 	"\n" +
 	"dek_result\x18\x02 \x01(\v2\x1a.keymanager.DEKBlindResultH\x00R\tdekResultB\x11\n" +
 	"\x0fregister_result\"W\n" +
@@ -707,7 +686,10 @@ const file_keymanager_proto_rawDesc = "" +
 	"user_blind\x18\x02 \x01(\tR\tuserBlind\"[\n" +
 	"\x0fKEKRegistration\x12\x14\n" +
 	"\x05scope\x18\x01 \x01(\tR\x05scope\x122\n" +
-	"\tid_params\x18\x02 \x01(\v2\x15.keymanager.DEKGetterR\bidParams\"b\n" +
+	"\tid_params\x18\x02 \x01(\v2\x15.keymanager.DEKGetterR\bidParams\"\x1e\n" +
+	"\n" +
+	"KEKCreated\x12\x10\n" +
+	"\x03kek\x18\x01 \x01(\fR\x03kek\"b\n" +
 	"\tDEKGetter\x12\x1f\n" +
 	"\vinner_scope\x18\x01 \x01(\tR\n" +
 	"innerScope\x12\x15\n" +
@@ -749,12 +731,12 @@ func file_keymanager_proto_rawDescGZIP() []byte {
 
 var file_keymanager_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_keymanager_proto_goTypes = []any{
-	(*Status)(nil),                 // 0: keymanager.Status
-	(*RegisterResponse)(nil),       // 1: keymanager.RegisterResponse
-	(*DekRegisterAndKEK)(nil),      // 2: keymanager.DekRegisterAndKEK
-	(*KEKAndDefaultDEKs)(nil),      // 3: keymanager.KEKAndDefaultDEKs
-	(*KEKGetter)(nil),              // 4: keymanager.KEKGetter
-	(*KEKRegistration)(nil),        // 5: keymanager.KEKRegistration
+	(*RegisterResponse)(nil),       // 0: keymanager.RegisterResponse
+	(*DekRegisterAndKEK)(nil),      // 1: keymanager.DekRegisterAndKEK
+	(*KEKAndDefaultDEKs)(nil),      // 2: keymanager.KEKAndDefaultDEKs
+	(*KEKGetter)(nil),              // 3: keymanager.KEKGetter
+	(*KEKRegistration)(nil),        // 4: keymanager.KEKRegistration
+	(*KEKCreated)(nil),             // 5: keymanager.KEKCreated
 	(*DEKGetter)(nil),              // 6: keymanager.DEKGetter
 	(*DEKIdentAndKEK)(nil),         // 7: keymanager.DEKIdentAndKEK
 	(*DEKDefaultRegistration)(nil), // 8: keymanager.DEKDefaultRegistration
@@ -762,20 +744,20 @@ var file_keymanager_proto_goTypes = []any{
 	(*DEKBlindResult)(nil),         // 10: keymanager.DEKBlindResult
 }
 var file_keymanager_proto_depIdxs = []int32{
-	0,  // 0: keymanager.RegisterResponse.status:type_name -> keymanager.Status
+	5,  // 0: keymanager.RegisterResponse.kek_result:type_name -> keymanager.KEKCreated
 	10, // 1: keymanager.RegisterResponse.dek_result:type_name -> keymanager.DEKBlindResult
 	10, // 2: keymanager.DekRegisterAndKEK.dekId:type_name -> keymanager.DEKBlindResult
-	5,  // 3: keymanager.KEKAndDefaultDEKs.kek:type_name -> keymanager.KEKRegistration
+	4,  // 3: keymanager.KEKAndDefaultDEKs.kek:type_name -> keymanager.KEKRegistration
 	8,  // 4: keymanager.KEKAndDefaultDEKs.dek:type_name -> keymanager.DEKDefaultRegistration
 	6,  // 5: keymanager.KEKRegistration.id_params:type_name -> keymanager.DEKGetter
-	4,  // 6: keymanager.DEKRegistration.kek_id:type_name -> keymanager.KEKGetter
+	3,  // 6: keymanager.DEKRegistration.kek_id:type_name -> keymanager.KEKGetter
 	8,  // 7: keymanager.DEKRegistration.dek_id:type_name -> keymanager.DEKDefaultRegistration
 	6,  // 8: keymanager.KeyManager.DecryptKEKAndGetReference:input_type -> keymanager.DEKGetter
-	3,  // 9: keymanager.KeyManager.RegisterKEK:input_type -> keymanager.KEKAndDefaultDEKs
+	2,  // 9: keymanager.KeyManager.RegisterKEK:input_type -> keymanager.KEKAndDefaultDEKs
 	9,  // 10: keymanager.KeyManager.RegisterDEK:input_type -> keymanager.DEKRegistration
 	7,  // 11: keymanager.KeyManager.DecryptKEKAndGetReference:output_type -> keymanager.DEKIdentAndKEK
-	1,  // 12: keymanager.KeyManager.RegisterKEK:output_type -> keymanager.RegisterResponse
-	2,  // 13: keymanager.KeyManager.RegisterDEK:output_type -> keymanager.DekRegisterAndKEK
+	0,  // 12: keymanager.KeyManager.RegisterKEK:output_type -> keymanager.RegisterResponse
+	1,  // 13: keymanager.KeyManager.RegisterDEK:output_type -> keymanager.DekRegisterAndKEK
 	11, // [11:14] is the sub-list for method output_type
 	8,  // [8:11] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
@@ -788,11 +770,11 @@ func file_keymanager_proto_init() {
 	if File_keymanager_proto != nil {
 		return
 	}
-	file_keymanager_proto_msgTypes[1].OneofWrappers = []any{
-		(*RegisterResponse_Status)(nil),
+	file_keymanager_proto_msgTypes[0].OneofWrappers = []any{
+		(*RegisterResponse_KekResult)(nil),
 		(*RegisterResponse_DekResult)(nil),
 	}
-	file_keymanager_proto_msgTypes[3].OneofWrappers = []any{
+	file_keymanager_proto_msgTypes[2].OneofWrappers = []any{
 		(*KEKAndDefaultDEKs_Kek)(nil),
 		(*KEKAndDefaultDEKs_Dek)(nil),
 	}

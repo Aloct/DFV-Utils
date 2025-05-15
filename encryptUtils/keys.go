@@ -77,14 +77,6 @@ func (dc *DEKCombKEK) RegisterNewKEK(pool wrapperUtils.DBPool, publicDB wrapperU
 	var kek *memguard.Enclave
 	var err error
 
-	switch dc.KEKInfos.Algorithm {
-	case "AES":
-		kek, err = CreateAESKey(32)
-		if err != nil {
-			return err
-		}
-	}
-
 	userBlind, err := CreateUserBlind(serviceMasterSalt, dc.Scope, "0", "KEK")
 	if err != nil {
 		return err
@@ -115,10 +107,12 @@ func (dc *DEKCombKEK) RegisterNewKEK(pool wrapperUtils.DBPool, publicDB wrapperU
 	if err == io.EOF {
 		return errors.New("stream closed unexpectedly by server")
 	}
-	statusResp, ok := resp.RegisterResult.(*proto.RegisterResponse_Status)
-	if !ok || statusResp.Status.StatusCode != 7001 {
-		return errors.New("failed to register KEK")
+	keyRaw, ok := resp.RegisterResult.(*proto.RegisterResponse_KekResult)
+	if !ok {
+		return errors.New("kek registration failed")
 	}
+
+	kek = memguard.NewEnclave(keyRaw.KekResult.Kek)
 
 	// bodyMultiData := &bytes.Buffer{}
 	// w := multipart.NewWriter(bodyMultiData)

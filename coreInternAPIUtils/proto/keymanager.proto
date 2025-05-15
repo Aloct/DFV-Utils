@@ -11,15 +11,9 @@ service KeyManager {
 
 // --- Universal Types ---
 
-message Status {
-  int32 status_code = 1;
-  int32 assigned_id = 2;
-  string message = 3;
-}
-
 message RegisterResponse {
   oneof register_result {
-    Status status = 1;               // Used for KEK
+    KEKCreated kek_result = 1;               // Used for KEK
     DEKBlindResult dek_result = 2;   // Used for DEKs
   }
 }
@@ -48,6 +42,10 @@ message KEKGetter {
 message KEKRegistration {
   string scope = 1;
   DEKGetter id_params = 2;
+}
+
+message KEKCreated {
+  bytes kek = 1;
 }
 
 // --- DEK Related Types ---
