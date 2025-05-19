@@ -3,6 +3,7 @@ package wrapperUtils
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -270,8 +271,41 @@ func (sr *MySQLWrapper) Close() error {
 	return nil
 }
 
+func (sr *MySQLWrapper) GetNextVersion(scopeType, relationBlind string, reencryptDatasets bool) (int, error) {
+	if scopeType != "scope" && scopeType != "innerscope" {
+		return -1, errors.New("wrong format for scopeType")
+	}
+	var max int
+	err := sr.DB.QueryRow("SELECT maxversion FROM verstrack WHERE scope = ").Scan(&max)
+	if err != nil {
+		return -1, err
+	}
+
+	var cur int 
+	err = sr.DB.QueryRow("SEKECT k_val FROM kstore WHERE kstatus = active").Scan(&cur)
+	if err != nil {
+		return -1, err
+	}
+
+	if cur == max {
+		if reencryptDatasets {
+			// make call to audit, reencrypt data which uses key with version 0
+		}
+
+		err := sr.RemoveData("vers", fmt.Sprintf("%d", max), "kstore")
+		if err != nil {
+			return -1, err
+		}
+
+		return 0, nil 
+	} else {
+		return cur + 1, nil
+	}
+}
 
 // key is not handled in a enclave cause its already encrypted
+
+// CHANGE GETKEY TO GET KEY BY VERSION FILTERED
 func (sr *MySQLWrapper) GetKey(id, idType string) (any, error) {
 	if (idType != "relation" && idType != "uniqueid") {
 		return nil, fmt.Errorf("invalid id type")
@@ -373,8 +407,8 @@ func (sr *MySQLWrapper) SetData(query string, values []any, n *time.Duration) er
 	return nil
 }
 
-func (sr *MySQLWrapper) RemoveData(key string, value string) error {
-	_, err := sr.DB.Exec(fmt.Sprintf("DELETE FROM kstore WHERE %s = ?", key), value)
+func (sr *MySQLWrapper) RemoveData(key, value, table string) error {
+	_, err := sr.DB.Exec(fmt.Sprintf("DELETE FROM %s WHERE %s = ?", table, key), value)
 	if err != nil {
 		return err
 	}
